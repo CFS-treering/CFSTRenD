@@ -4,7 +4,14 @@
 \alias{detrend_site}
 \title{species-site level of detrending BAI using gamm}
 \usage{
-detrend_site(data, mtd, m.candidates, out.csv = FALSE, out.dir = NULL)
+detrend_site(
+  data,
+  mtd,
+  m.candidates,
+  out.mod = FALSE,
+  out.csv = FALSE,
+  out.dir = NULL
+)
 }
 \arguments{
 \item{data}{: datatable}
@@ -13,7 +20,9 @@ detrend_site(data, mtd, m.candidates, out.csv = FALSE, out.dir = NULL)
 
 \item{m.candidates}{: the list of RHS of formulas}
 
-\item{out.csv}{: output csv file (TRUE or FALSE)}
+\item{out.mod}{: output gamm object (TRUE or FALSE)}
+
+\item{out.csv}{: output csv files (TRUE or FALSE)}
 
 \item{out.dir}{: directory of output csv files}
 }

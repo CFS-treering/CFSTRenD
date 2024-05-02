@@ -10,6 +10,8 @@
 #' @examples
 #' meta.all <- variables.cfstrend()
 variables.cfstrend <- function(){
+  # data structure version, it changes with the structure changes,
+  Ver.stru <- "s1.2"
 meta.Projects <-data.table(Variable = c( "uid_project", "submission_id", "project_name", "description",  "year_range", "reference", "open_data",  "contact1", "contact2"),
                          Format = c("integer", "integer", "character",  "character",  "character", "character",  "logical","character","character"),
                           Description = c("unique project identification used in treeSource","submission identification", "original project identification",  "Project description",
@@ -78,6 +80,40 @@ meta.Ringwidths <-data.table(Variable = c("uid_radius", "year",  "rw_mm"),
                          Required = c(0,1,1)
 )
 
+# V1.2 uids being removed
+meta.uids_removed <-data.table(Variable = c("modification_id", "uid_removed", "uid_level",  "submission_id", "uid_project",  "ver_firstremoved",  "ver_lastexist", "reason", "investigator"),
+                               Format = c(  "integer",  "integer",  "character", "integer",  "integer", "character","character","character","character"),
+                               Description = c("modification id", "uid removed", "the level of uid below which all uids will be removed('uid_XXX')", "submission_id which uids were removed",
+                                                "uid_project in which uids were removed","the first version in which uid_removed disappear from the dataset",
+                                                "the last version in which uid_removed still exist in the dataset", "reason for removing the uid_removed", "investigator"),
+                               Required = c(1,0,1,1,0,1,1,1,1)
+)
+
+# BEGIN;
+# CREATE TABLE tr.tr_8_uids_removed (
+#   modification_id integer PRIMARY KEY,
+#   uid_removed integer,
+#   uid_level TEXT,
+#   submission_id integer,
+#   uid_project integer,
+#   ver_firstremoved TEXT,
+#   ver_lastexist TEXT,
+#   reason TEXT,
+#   investigator TEXT
+# );
+#
+# COMMENT ON COLUMN tr.tr_8_uids_removed.modification_id IS 'modification id.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.uid_removed IS 'uid removed.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.uid_level IS 'the level of uid below which all uids will be removed(uid_XXX).';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.submission_id IS 'submission_id which uids were removed.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.uid_project IS 'uid_project in which uids were removed.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.ver_firstremoved IS 'the first version in which uid_removed disappear from the dataset.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.ver_lastexist IS 'the last version in which uid_removed still exist in the dataset.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.reason IS 'reason for removing the uid_removed.';
+# COMMENT ON COLUMN tr.tr_8_uids_removed.investigator IS 'investigator.';
+# COMMIT;
+
+
 # ts.lst <- c("tr_1_projects", "tr_2_sites", "tr_3_trees", "tr_4_meas", "tr_5_samples", "tr_6_radiuses", "tr_7_ring_widths")
 
 meta.all <- rbind(meta.Projects[,table := "tr_1_projects"],
@@ -86,8 +122,10 @@ meta.all <- rbind(meta.Projects[,table := "tr_1_projects"],
                   meta.Meas[,table := "tr_4_meas"],
                   meta.Samples[,table := "tr_5_samples"],
                   meta.Radius[,table := "tr_6_radiuses"],
-                  meta.Ringwidths[,table := "tr_7_ring_widths"]
+                  meta.Ringwidths[,table := "tr_7_ring_widths"],
+                  meta.uids_removed[,table := "tr_8_uids_removed"]
                   )
+meta.all$ver.structure <- Ver.stru
 # print(is.data.table(meta.all))
 # Separate the elements with commas
 

@@ -6,12 +6,12 @@
 \usage{
 count_uids(
   data,
-  yend,
+  crit_yr,
   resol_lat,
   resol_lon,
   uid,
   N.species = 999,
-  make.plot = FALSE,
+  make.plot = TRUE,
   out.csv = FALSE,
   out.dir = NULL
 )
@@ -19,7 +19,7 @@ count_uids(
 \arguments{
 \item{data}{:  input 2 tables: header and rw}
 
-\item{yend}{: year criteria}
+\item{crit_yr}{: year criteria}
 
 \item{resol_lat}{:latitude resolution}
 
