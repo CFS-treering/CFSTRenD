@@ -90,30 +90,30 @@ meta.uids_updated <-data.table(Variable = c("modification_id", "action", "uid_af
 )
 
 # BEGIN;
-CREATE TABLE tr.tr_8_uids_updated (
-  modification_id integer PRIMARY KEY,
-  action TEXT,
-  uid_affected integer,
-  uid_level TEXT,
-  submission_id integer,
-  uid_project integer,
-  ver_firstupdated TEXT,
-  ver_lastexists TEXT,
-  reason TEXT,
-  investigator TEXT
-);
-
-COMMENT ON COLUMN tr.tr_8_uids_updated.modification_id IS 'modification id.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.action IS 'Delete (D) or Modify (M) ring widths';
-COMMENT ON COLUMN tr.tr_8_uids_updated.uid_affected IS 'uid affected.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.uid_level IS 'the level of uid below which all uids will be removed(uid_XXX).';
-COMMENT ON COLUMN tr.tr_8_uids_updated.submission_id IS 'submission_id which uids_affected belongs to.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.uid_project IS 'uid_project which uid_affected belongs to.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.ver_firstupdated IS 'the first version in which uid_affected get updated.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.ver_lastexists IS 'the last version before uid_affected getupdated.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.reason IS 'reason for updating uid_affected.';
-COMMENT ON COLUMN tr.tr_8_uids_updated.investigator IS 'investigator.';
-COMMIT;
+# CREATE TABLE tr.tr_8_uids_updated (
+#   modification_id integer PRIMARY KEY,
+#   action TEXT,
+#   uid_affected integer,
+#   uid_level TEXT,
+#   submission_id integer,
+#   uid_project integer,
+#   ver_firstupdated TEXT,
+#   ver_lastexists TEXT,
+#   reason TEXT,
+#   investigator TEXT
+# );
+#
+# COMMENT ON COLUMN tr.tr_8_uids_updated.modification_id IS 'modification id.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.action IS 'Delete (D) or Modify (M) ring widths';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.uid_affected IS 'uid affected.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.uid_level IS 'the level of uid below which all uids will be removed(uid_XXX).';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.submission_id IS 'submission_id which uids_affected belongs to.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.uid_project IS 'uid_project which uid_affected belongs to.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.ver_firstupdated IS 'the first version in which uid_affected get updated.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.ver_lastexists IS 'the last version before uid_affected getupdated.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.reason IS 'reason for updating uid_affected.';
+# COMMENT ON COLUMN tr.tr_8_uids_updated.investigator IS 'investigator.';
+# COMMIT;
 
 
 # ts.lst <- c("tr_1_projects", "tr_2_sites", "tr_3_trees", "tr_4_meas", "tr_5_samples", "tr_6_radiuses", "tr_7_ring_widths")
