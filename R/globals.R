@@ -12,7 +12,8 @@ utils::globalVariables(c(
   "se.fit.s.ageC", "selected",   "site_ID1.01.0", "specialchar",   "v.idx",
   "lat", "lon", "meas_date", "ord", "species", "uid_radius.tmp", "value", "variable",
   "year_range", "ymax", "ymax.proj", "ymin", "ymin.proj", "yr.meas",
-  "list.tbl", "pct.species", "spc.pct", "nuids", "bark_thickness_mm"
+  "list.tbl", "pct.species", "spc.pct", "nuids", "bark_thickness_mm",
+  "block_id","rw.N.sc"
   )
 )
 

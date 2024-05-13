@@ -125,7 +125,7 @@ meta.all <- rbind(meta.Projects[,table := "tr_1_projects"],
                   meta.Samples[,table := "tr_5_samples"],
                   meta.Radius[,table := "tr_6_radiuses"],
                   meta.Ringwidths[,table := "tr_7_ring_widths"],
-                  meta.uids_removed[,table := "tr_8_uids_removed"]
+                  meta.uids_updated[,table := "tr_8_uids_updated"]
                   )
 meta.all$ver.structure <- Ver.stru
 # print(is.data.table(meta.all))
