@@ -49,9 +49,10 @@ read_rwl <-function (dir.src, rwl) {
 
   dt.lines <- data.table(lines = readLines(con <- file(file.path(dir.src, rwl))))
   close(con)
+  print(paste0("reading ", rwl))
   comments <- ""
   dt.lines <- dt.lines[!(trimws(lines, which = "both") == "")]
-  if (nrow(dt.lines) < 5) stop(paste0("not enough lines, please check ", rwl))
+  if (nrow(dt.lines) < 5) stop(paste0("not enough lines, please check "))
 # 1st line
   line1 <- trimws(dt.lines[1,]$lines, which = "right")
   # Record #1: 1-6 Site ID, 10-61 Site Name, 62-65 Species Code
@@ -63,7 +64,7 @@ read_rwl <-function (dir.src, rwl) {
   L1_aux.s <- trimws(str_remove(rest.spc, spc_code.s), which = "both")
 
   if (nchar(spc_code.s) != 4 | str_detect(spc_code.s, "\\s") > 0) {
-    message(paste0(rwl, " check spc_code$ ", spc_code.s))
+    message(paste0(" check spc_code$ ", spc_code.s))
             comments <- paste0(comments, " spc_code")
 }
   # spc_code.0 <- trimws(str_sub(line1,62,65), which = "both")
@@ -83,14 +84,14 @@ read_rwl <-function (dir.src, rwl) {
   rest4.split <- strsplit(rest4, "(?<=\\S)\\s\\s", perl = TRUE)[[1]]
 
   if (length(rest4.split) < 5) {
-    message(paste0("pls check line2$stat_con$", stat_con.s))
+    message(paste0(" check line2$stat_con$", stat_con.s))
     comments <- paste0(comments, " stat_con")
 }
   species.s <- trimws(rest4.split[1], which = "both")
   pos.N <- regexpr("[0-9]", species.s)
   if (pos.N > 0) {
     species.s <- trimws(str_sub(species.s, 1, (pos.N - 1)), which = "both")
-    message(paste0("pls check line2$species$", species.s))
+    message(paste0(" check line2$species$", species.s))
     comments <- paste0(comments, " species")
   pos.N <- NULL
   }
@@ -98,7 +99,7 @@ read_rwl <-function (dir.src, rwl) {
   rest3.split <- strsplit(rest3, "(?<=\\S)\\s\\s", perl = TRUE)[[1]]
 
   if (length(rest3.split) < 4) {
-    message(paste0("pls check line2$species$", species.s))
+    message(paste0(" check line2$species$", species.s))
     comments <- paste0(comments, " species")
     }
 
@@ -191,7 +192,8 @@ read_rwl <-function (dir.src, rwl) {
   # dt.rwl[, id.core:=tstrsplit(lines, " ", fixed = TRUE, keep = 1L)]
   dt.rwl[, id.core:=trimws(str_sub(lines, 1,8))]
   dt.rwl[, rest := trimws(str_sub(lines, 9), which = "both")]
-# spcial characters in lines
+
+ # spcial characters in lines
   if (nrow(dt.rwl[grepl("\t|\\(", lines)]) > 0) {
     dt.rwl[grepl("\t|\\(", lines),specialchar:= 1]
     message(paste0("special character in ", rwl, "  ", paste(unique(dt.rwl[specialchar == 1]$id.core), collapse = " ")))
@@ -237,11 +239,12 @@ read_rwl <-function (dir.src, rwl) {
   if (nrow(dt.rwl[is.na(decade.yr)]) > 0){
     stop(paste0("missing decade year in "), rwl)
   }
-  dt.rwl[, dif.decade:= decade.yr - shift(decade.yr), by = .(id.core)]
-  dt.rwl[, id2 := seq_len(.N),by = c("id.core")]
-
-  if (nrow(dt.rwl[id2 > 2 & dif.decade != 10]) > 0) {
-    message(paste0("multiple sections in ", rwl))
+  # dt.rwl[, dif.decade:= decade.yr - shift(decade.yr), by = .(id.core)]
+  # dt.rwl[, id2 := seq_len(.N),by = c("id.core")]
+  dt.rwl[, block_id := rleid(id.core)]
+  if (nrow(dt.rwl[, .N, by = .(block_id, id.core)][, .N, by = .(id.core)][N>1]) > 0){
+  # if (nrow(dt.rwl[id2 > 2 & dif.decade != 10]) > 0) {
+    message(paste0(" detected multiple sections-1"))
     # print(dt.rwl[id2 > 2 & dif.decade != 10])
     comments.rw <- paste0(comments.rw, " multi_section")
   }
@@ -261,8 +264,8 @@ read_rwl <-function (dir.src, rwl) {
     comments.rw <- paste0(comments.rw, " extra_columns")
   }
 
-  dt.rwl.long <- melt(dt.rwl[, c("id.core", "decade.yr", paste0("V",0:9))],
-                      id.vars=c("id.core", "decade.yr"),
+  dt.rwl.long <- melt(dt.rwl[, c("block_id", "id.core", "decade.yr", paste0("V",0:9))],
+                      id.vars=c("block_id", "id.core", "decade.yr"),
 
                       variable.name="v.idx",
                       value.name="rw_int")[!is.na(rw_int)]
@@ -270,8 +273,8 @@ read_rwl <-function (dir.src, rwl) {
   dt.rwl.long[,rw.N:= as.numeric(rw_int)]
   dt.rwl.long[,year:=decade.yr + as.integer(str_sub(v.idx, 2,2))]
 
-  setorder(dt.rwl.long, id.core, year)
-  id.core.scale <- dt.rwl.long[, .SD[.N], by = id.core]
+  setorder(dt.rwl.long, block_id, id.core, year)
+  id.core.scale <- dt.rwl.long[, .SD[.N], by = c("block_id", "id.core")]
   if (nrow(id.core.scale[!(rw.N %in% c(999,-9999))]) > 0) {
     stop(paste0("check scale ", paste(id.core.scale[!(rw.N %in% c(999,-9999))]$rw.N, collapse = " " ), " in ", rwl))
     }
@@ -280,15 +283,23 @@ read_rwl <-function (dir.src, rwl) {
     message(paste0("check multiple scale in ", rwl))
     comments.rw <- paste0(comments.rw, " multi_scale")
     }
-  dt.rwl.long<- dt.rwl.long[!id.core.scale, on = .(id.core, year)]
-  dt.rwl.long <- dt.rwl.long[id.core.scale[,c("id.core", "rw.sc")], on = c("id.core")]
+  dt.rwl.long<- dt.rwl.long[!id.core.scale, on = .(block_id, id.core, year)]
+  setnames(id.core.scale, "rw.N", "rw.N.sc")
+  dt.rwl.long <- dt.rwl.long[id.core.scale[,c("block_id", "id.core", "rw.N.sc", "rw.sc")], on = c("block_id", "id.core")]
+  # remove ending
+  dt.end <- dt.rwl.long[ rw.N == rw.N.sc]
+  if (nrow(dt.end) > 0) {
+    message(paste0("ending ", unique(dt.end$rw.N.sc), "was found in the middle of series"))
+    comments.rw <- paste0(comments.rw, " multi-section-0")
+  dt.rwl.long <- dt.rwl.long[ rw.N != rw.N.sc]
+  }
   dt.rwl.long [,rw_mm:= rw.N*rw.sc]
-  names(dt.rwl.long)
+  # names(dt.rwl.long)
   if (nrow(dt.rwl.long[rw_mm < 0 | is.na(rw_mm)]) > 0){
-    message(paste0("negative or missing rw in ", rwl))
+    message(paste0(" detected negative or missing rw"))
     comments.rw <- paste0(comments.rw, " neg_or_NA_rw")
   }
-  if (nrow(dt.rwl.long[, .N, by = .(id.core, year)][N >1]) > 0){
+  if (nrow(dt.rwl.long[, .N, by = .(block_id, id.core, year)][N >1]) > 0){
     message(paste0("duplicated id.core-year ", rwl))
     comments.rw <- paste0(comments.rw, " dup_id_year")
   }

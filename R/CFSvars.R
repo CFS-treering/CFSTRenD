@@ -81,37 +81,39 @@ meta.Ringwidths <-data.table(Variable = c("uid_radius", "year",  "rw_mm"),
 )
 
 # V1.2 uids being removed
-meta.uids_removed <-data.table(Variable = c("modification_id", "uid_removed", "uid_level",  "submission_id", "uid_project",  "ver_firstremoved",  "ver_lastexist", "reason", "investigator"),
-                               Format = c(  "integer",  "integer",  "character", "integer",  "integer", "character","character","character","character"),
-                               Description = c("modification id", "uid removed", "the level of uid below which all uids will be removed('uid_XXX')", "submission_id which uids were removed",
-                                                "uid_project in which uids were removed","the first version in which uid_removed disappear from the dataset",
-                                                "the last version in which uid_removed still exist in the dataset", "reason for removing the uid_removed", "investigator"),
-                               Required = c(1,0,1,1,0,1,1,1,1)
+meta.uids_updated <-data.table(Variable = c("modification_id", "action", "uid_affected", "uid_level",  "submission_id", "uid_project",  "ver_firstupdated",  "ver_lastexist", "reason", "investigator"),
+                               Format = c(  "integer","character",   "integer",  "character", "integer",  "integer", "character","character","character","character"),
+                               Description = c("modification id", "Delete (D) or Modify (M) ring widths", "uid affected", "the level of uid below which all uids will be removed('uid_XXX')", "submission_id which uids_affected belongs to",
+                                                "uid_project which uid_affected belongs to","the first version in which uid_affected get updated",
+                                                "the last version before uid_affected get updated", "reason for updating uid_affected", "investigator"),
+                               Required = c(1,1,0,1,1,0,1,1,1,1)
 )
 
 # BEGIN;
-# CREATE TABLE tr.tr_8_uids_removed (
-#   modification_id integer PRIMARY KEY,
-#   uid_removed integer,
-#   uid_level TEXT,
-#   submission_id integer,
-#   uid_project integer,
-#   ver_firstremoved TEXT,
-#   ver_lastexist TEXT,
-#   reason TEXT,
-#   investigator TEXT
-# );
-#
-# COMMENT ON COLUMN tr.tr_8_uids_removed.modification_id IS 'modification id.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.uid_removed IS 'uid removed.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.uid_level IS 'the level of uid below which all uids will be removed(uid_XXX).';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.submission_id IS 'submission_id which uids were removed.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.uid_project IS 'uid_project in which uids were removed.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.ver_firstremoved IS 'the first version in which uid_removed disappear from the dataset.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.ver_lastexist IS 'the last version in which uid_removed still exist in the dataset.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.reason IS 'reason for removing the uid_removed.';
-# COMMENT ON COLUMN tr.tr_8_uids_removed.investigator IS 'investigator.';
-# COMMIT;
+CREATE TABLE tr.tr_8_uids_updated (
+  modification_id integer PRIMARY KEY,
+  action TEXT,
+  uid_affected integer,
+  uid_level TEXT,
+  submission_id integer,
+  uid_project integer,
+  ver_firstupdated TEXT,
+  ver_lastexists TEXT,
+  reason TEXT,
+  investigator TEXT
+);
+
+COMMENT ON COLUMN tr.tr_8_uids_updated.modification_id IS 'modification id.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.action IS 'Delete (D) or Modify (M) ring widths';
+COMMENT ON COLUMN tr.tr_8_uids_updated.uid_affected IS 'uid affected.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.uid_level IS 'the level of uid below which all uids will be removed(uid_XXX).';
+COMMENT ON COLUMN tr.tr_8_uids_updated.submission_id IS 'submission_id which uids_affected belongs to.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.uid_project IS 'uid_project which uid_affected belongs to.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.ver_firstupdated IS 'the first version in which uid_affected get updated.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.ver_lastexists IS 'the last version before uid_affected getupdated.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.reason IS 'reason for updating uid_affected.';
+COMMENT ON COLUMN tr.tr_8_uids_updated.investigator IS 'investigator.';
+COMMIT;
 
 
 # ts.lst <- c("tr_1_projects", "tr_2_sites", "tr_3_trees", "tr_4_meas", "tr_5_samples", "tr_6_radiuses", "tr_7_ring_widths")

@@ -63,7 +63,8 @@ CFS_format <- function (data, out.csv = FALSE, out.dir = NULL) {
   meta.all0 <- variables.cfstrend()
   meta.all <- meta.all0[!str_detect(Variable, "uid_")]
   setdiff(meta.all0$Variable, meta.all$Variable)
-  cols.musthave <-as.character( meta.all[Required == 1 & table != "tr_7_ring_widths"]$Variable)
+  # must-have meta variables for tr_1 to tr_6
+  cols.musthave <-as.character( meta.all[Required == 1 & !(table %in% c("tr_7_ring_widths", "tr_8_uids_removed"))]$Variable)
   add.Vars <- setdiff(cols.musthave, names(dt.meta))
 
 if (length(add.Vars) > 0) {
