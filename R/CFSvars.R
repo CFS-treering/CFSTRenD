@@ -19,13 +19,13 @@ meta.Projects <-data.table(Variable = c( "uid_project", "submission_id", "projec
                          Required = c(0,1,1,2,2,2,1,1,2)
 )
 
-meta.Sites <-data.table(Variable = c( "uid_site",  "site_id",    "latitude" ,      "longitude",  "datasource", "investigators"),
-                           Format = c("integer", "character",     "numeric",         "numeric", "character", "character"),
+meta.Sites <-data.table(Variable = c( "uid_site",  "site_id",    "latitude" ,      "longitude",  "datasource", "investigators", "province_iso_code"),
+                           Format = c("integer", "character",     "numeric",         "numeric", "character", "character", "character"),
 
                            Description = c("unique site identification used in treeSource",
                                            "original site identification",   "  decimal degrees (positive for N)",
-                                  "decimal degrees (negative for W)", "inventory/target", "Investigators"),
-                           Required = c(0,1,1,1,2,2)
+                                  "decimal degrees (negative for W)", "inventory/target", "Investigators", "province iso code"),
+                           Required = c(0,1,1,1,2,2,1)
 )
 
 

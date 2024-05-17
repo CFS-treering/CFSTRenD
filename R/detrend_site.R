@@ -111,7 +111,7 @@ if(mtd == "REML" & length(m.candidates) == 1) {
     fit.bai + qnorm(0.975) * se.fit.bai)]
 
   # names(tmp.bai)
-  fit.s.age <- "fit.s.ageC..species.fac"
+  # fit.s.age <- "fit.s.ageC..species.fac"
 
 
 
