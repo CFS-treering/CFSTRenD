@@ -100,7 +100,7 @@ if(mtd == "REML" & length(m.candidates) == 1) {
   if (out.mod) saveRDS(m.sel, compress = TRUE, file =   file.path(out.dir, paste0("sel.mod_REML",".rds")))
 
  pred.terms  <-as.data.frame( predict(m.sel$gam, type="terms",se.fit=TRUE))
-
+  setnames(pred.terms, c("fit.s.ageC.", "se.fit.s.ageC."),c("fit.s.ageC", "se.fit.s.ageC"))
   fit.bai <- as.data.frame(predict(m.sel$gam, type = "response", se.fit = TRUE))
   names(fit.bai) <- c("fit.bai", "se.fit.bai")
   tmp.bai <- data.table(data, pred.terms, fit.bai)
