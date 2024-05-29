@@ -76,7 +76,7 @@ rm(m.sel)
 if (out.csv == TRUE){
   if (is.null(out.dir)) message("please provide the directiory to output csv files")  else{
     if (!(dir.exists(out.dir))) dir.create(out.dir, recursive = TRUE)
-write.csv(aic.all, file =  file.path(out.dir, paste0("fitting ", mtd ,".csv"), row.names = FALSE, na = ""))
+write.csv(aic.all, file =  file.path(out.dir, paste0("fitting ", mtd ,".csv")), row.names = FALSE, na = "")
   }
 }
   }
