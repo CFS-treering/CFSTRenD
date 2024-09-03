@@ -83,37 +83,13 @@ meta.Ringwidths <-data.table(Variable = c("uid_radius", "year",  "rw_mm"),
 # V1.2 uids being removed
 meta.uids_updated <-data.table(Variable = c("modification_id", "action", "uid_affected", "uid_level",  "submission_id", "uid_project",  "ver_firstupdated",  "ver_lastexist", "reason", "investigator"),
                                Format = c(  "integer","character",   "integer",  "character", "integer",  "integer", "character","character","character","character"),
-                               Description = c("modification id", "Delete (D) or Modify (M) ring widths", "uid affected", "the level of uid below which all uids will be affected('uid_XXX')", "submission_id which uids_affected belongs to",
+                               Description = c("modification id", "Delete (D) or Modify (M) ring widths", "uid affected", "the level of uid_affected below(including) which all uids be affected(uid_XXX)",
+                                               "submission_id which uids_affected belongs to",
                                                 "uid_project which uid_affected belongs to","the first version in which uid_affected get updated",
                                                 "the last version before uid_affected get updated", "reason for updating uid_affected", "investigator"),
                                Required = c(1,1,0,1,1,0,1,1,1,1)
 )
 
-# BEGIN;
-# CREATE TABLE tr.tr_8_uids_updated (
-#   modification_id integer PRIMARY KEY,
-#   action TEXT,
-#   uid_affected integer,
-#   uid_level TEXT,
-#   submission_id integer,
-#   uid_project integer,
-#   ver_firstupdated TEXT,
-#   ver_lastexists TEXT,
-#   reason TEXT,
-#   investigator TEXT
-# );
-#
-# COMMENT ON COLUMN tr.tr_8_uids_updated.modification_id IS 'modification id.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.action IS 'Delete (D) or Modify (M) ring widths';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.uid_affected IS 'uid affected.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.uid_level IS 'the level of uid below which all uids will be affected(uid_XXX).';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.submission_id IS 'submission_id which uids_affected belongs to.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.uid_project IS 'uid_project which uid_affected belongs to.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.ver_firstupdated IS 'the first version in which uid_affected get updated.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.ver_lastexist IS 'the last version before uid_affected getupdated.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.reason IS 'reason for updating uid_affected.';
-# COMMENT ON COLUMN tr.tr_8_uids_updated.investigator IS 'investigator.';
-# COMMIT;
 
 
 # ts.lst <- c("tr_1_projects", "tr_2_sites", "tr_3_trees", "tr_4_meas", "tr_5_samples", "tr_6_radiuses", "tr_7_ring_widths")
@@ -127,6 +103,7 @@ meta.all <- rbind(meta.Projects[,table := "tr_1_projects"],
                   meta.Ringwidths[,table := "tr_7_ring_widths"],
                   meta.uids_updated[,table := "tr_8_uids_updated"]
                   )
+meta.all[, col.ord:=seq_len(.N), by = table]
 meta.all$ver.structure <- Ver.stru
 # print(is.data.table(meta.all))
 # Separate the elements with commas
