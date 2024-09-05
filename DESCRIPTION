@@ -17,4 +17,6 @@ Imports:
   stats (>= 3.0.0),
   utils (>= 3.0.0),
   ggplot2 (>= 3.0.0),
-  nlme(>= 3.0)
+  nlme(>= 3.0.0),
+  purrr(>= 1.0.0),
+  parallel(>= 4.0.0)
