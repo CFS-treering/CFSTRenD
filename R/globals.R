@@ -15,7 +15,8 @@ utils::globalVariables(c(
   "list.tbl", "pct.species", "spc.pct", "nuids", "bark_thickness_mm",
   "block_id","rw.N.sc",
   "acf.trt", "ccf.ord", "max_lag", "max_ccf", "SampleID.chr", "RawRing", "Year",
-  "mean.rw.dif","mean.rw", "dt.trt.wide", "qa_code", "col.ord"
+  "mean.rw.dif","mean.rw", "dt.trt.wide", "qa_code", "col.ord",
+  "SampleID",  "colr", "id.label", "rw.treated"
   )
 )
 

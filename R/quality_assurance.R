@@ -1,3 +1,47 @@
+
+
+# functions
+
+#' pre-processing data in wide and long format for rawring and treated series
+#' @description
+#' pre-processing data in wide and long format for rawring and treated series
+#'
+#' @param dt.rw_long : original data with at least 3 columns (SampleID, Year, RawRing)
+
+#' @import data.table
+#' @export pre_dataFormat
+#'
+# prepare dt.rw_long for the master chronology and dt.wide to be used for pair-wise ccf
+pre_dataFormat <- function(dt.rw_long){
+  if (length(setdiff(c("SampleID", "Year","RawRing" ), names(dt.rw_long))) > 0) stop("at least one of the mandatory columns (SampleID, Year, RawRing) doesn't exist, please check...")
+
+
+  if (nrow(dt.rw_long[, .N, by = .(SampleID, Year)][N > 1]) > 0) stop("SampleID-Year is not unique key, please check...")
+  dt.rw_long <- dt.rw_long[, c("SampleID", "Year","RawRing" )]
+  setorder(dt.rw_long, SampleID,Year)
+  # the series to be used for ccf
+  dt.rw_long[, rw.treated:= RawRing - shift(RawRing), by = SampleID]
+
+  # SampleID.chr is the key sampleID, we use it in the functions to represent a sample.
+  # starting with a character to ensure the validity as column name and value of a column
+
+  dt.rw_long[, SampleID.chr:= paste0("d_", SampleID)]
+  setorder(dt.rw_long, SampleID.chr)
+  sample.lst <- sort(unique(dt.rw_long$SampleID.chr))
+
+  dt.rw_wide <- dcast(dt.rw_long[!is.na(rw.treated)], Year ~ SampleID.chr, value.var = "RawRing")
+  dt.trt_wide <- dcast(dt.rw_long[!is.na(rw.treated)], Year ~ SampleID.chr, value.var = "rw.treated")
+
+  setcolorder(dt.trt_wide, c("Year", sample.lst))
+
+  # remove the column Year to faciliate pair-wise ccf
+  # row.names(dt.trt_wide) <- dt.trt_wide$Year
+  # dt.trt_wide$Year <- NULL
+  return(list(dt.rw_long = dt.rw_long, dt.rw_wide = dt.rw_wide, dt.trt_wide = dt.trt_wide, sample.lst = sample.lst ))
+}
+
+
+
 # step 1: pair-wise ccf on all the samples. find all pairs that satisfies the condition that max_ccf @lag0
 #   the results of this step serves as the initial sample list of master chronology for step 2
 # step 2: run ccf between each sample and the mean of initial master chronology
@@ -7,14 +51,11 @@
 #   qa_code(Pass, borderline, highpeak, pm1) for each sample
 
 
-# functions
-
-#' tree ring data quality classification
+#' tree ring data quality classification and master chronology
 #' @description
 #' classify tree ring data in 4 classes ("pass","borderline", "highpeak", "pm1") using the detrended series based on 2 criteria: 1: treated
 #'
-#' @param dt.trt_wide : treated series in wide format for pair-wise ccf
-#' @param dt.rw_long : ring width series in long format for calculating mean of master chronology
+#' @param dt.input : tables from pre_dataFormat
 #' @param mtd.paired_ccf : processing approach for paired ccf c("S", "LB", "LP")
 #' @param batch_size :  batch size for processing large dataset
 #' @param max.lag : maximum lag for ccf
@@ -28,13 +69,14 @@
 #' @import parallel
 #'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
-#' @export tr.fullmaster
+#' @export tr_fullmaster
 #'
 
 
 
 
-tr.fullmaster <- function(dt.trt_wide , dt.rw_long , mtd.paired_ccf = "S", batch_size = 5000, max.lag = 10, max.trial = 100){
+tr_fullmaster <- function(dt.input , mtd.paired_ccf = "S", batch_size = 5000, max.lag = 10, max.trial = 100){
+  dt.trt_wide <- dt.input$dt.trt_wide; dt.trt_wide$Year <- NULL; dt.rw_long <- dt.input$dt.rw_long
   if (!(mtd.paired_ccf %in% c("S", "LB", "LP"))) stop("please specify mtd.paired_ccf as one of c('S', 'LB', 'LP')")
   # dt.trt_wide: treated series in wide format for pair-wise ccf
   # dt.rw_long: ring width series in long format for calculating mean of master chronology
@@ -124,16 +166,16 @@ tr.fullmaster <- function(dt.trt_wide , dt.rw_long , mtd.paired_ccf = "S", batch
   # algorithm on pass
 
   s2.end <- FALSE;  i.iter <- 1;
-  while(!s2.end & i.iter < max.trial){
+  while(!s2.end & i.iter <= max.trial){
 
     # mean of master chronology
     dt.s2.avg <- dt.rw_long[SampleID.chr %in%  id.candi][, .(.N, mean.rw = mean(RawRing)), by = .(Year)]
     setorder(dt.s2.avg, Year)
     dt.s2.avg [, mean.rw.dif:= mean.rw - shift(mean.rw)]
 
-    dt.s2.wide <- merge(dt.s2.avg[, c("Year", "mean.rw.dif")], dt.trt.wide, by = "Year")
+    dt.s2.wide <- merge(dt.s2.avg[, c("Year", "mean.rw.dif")], dt.input$dt.trt_wide, by = "Year")
     # ccf of all samples with the master chronology
-    dt.s2.ccf <-rbindlist(lapply(3:ncol(dt.s2.wide), ccf_avg, data = dt.s2.wide, max.lag = max.lag))
+    dt.s2.ccf <-rbindlist(lapply(3:ncol(dt.s2.wide), ccf_avg, data = dt.s2.wide, max.lag = max.lag, qa_code = "Fail"))
     # valid samples for master chronology
     id.pass <- unique(dt.s2.ccf[qa_code == "Pass"]$SampleID.chr)
     # id.dif <- setdiff(union(id.candi, id.pass) ,intersect (id.candi, id.pass))
@@ -147,7 +189,7 @@ tr.fullmaster <- function(dt.trt_wide , dt.rw_long , mtd.paired_ccf = "S", batch
     }
   }
   setorder(dt.s2.ccf, SampleID.chr)
-  dt.s2.avg[, c("s2.success", "iteration") := .(s2.end, i.iter)]
+  dt.s2.avg[, c("success", "iteration") := .(s2.end, i.iter)]
   return(list(dt.ccf = dt.s2.ccf, master = dt.s2.avg ))
   # the result of step 2 is dt.s2.ccf, samples with qa_code = "Pass" to form the master chronology
 
@@ -156,6 +198,20 @@ tr.fullmaster <- function(dt.trt_wide , dt.rw_long , mtd.paired_ccf = "S", batch
 
 
 # Define a function to calculate max cross-correlation lag
+
+#' pair-wise ccf
+#' @description
+#' pair-wise ccf
+#' @param ts1 : first series
+#' @param ts2 : second series
+#' @param max.lag : maximum lag for ccf
+
+
+#' @import data.table
+
+#'
+
+#' @export ccf_pairs
 ccf_pairs <- function(ts1, ts2, max.lag = 10) {
   ccf.chk <- ccf(ts1, ts2, lag.max = max.lag, na.action = na.pass,  plot = FALSE)
   max_ccf <- max(ccf.chk$acf)
@@ -163,6 +219,21 @@ ccf_pairs <- function(ts1, ts2, max.lag = 10) {
   return(list(max_lag = max_lag, max_ccf = max_ccf))
 }
 
+
+#' ccf with master/mean chronology
+#' @description
+#' ccf with master/mean chronology
+#' @param icol : column index
+#' @param data : data in wide format, first column is "Year", second column is master/mean chronology
+#' @param blcrit : criteria for borderline
+#' @param max.lag : maximum lag for ccf
+#' @param qa_code : quality classification code (NULL, no code)
+
+#' @import data.table
+
+#'
+
+#' @export ccf_avg
 ccf_avg <- function(icol, data, blcrit = 0.1, max.lag = 10, qa_code="Fail"){
 
   dt.pairs <- ccf(data[,2],data[,icol, with = FALSE],lag.max=max.lag,plot=FALSE, na.action = na.pass)
@@ -170,12 +241,16 @@ ccf_avg <- function(icol, data, blcrit = 0.1, max.lag = 10, qa_code="Fail"){
   setorder(dt.ccf, -acf.trt)
   dt.ccf[, ccf.ord:= 1:.N]
   setorder(dt.ccf, lag)
+
+  if (!is.null(qa_code)){
+    qa_code <- "Fail"
   # max acf at lag 0
   if (nrow(dt.ccf[lag == 0 & ccf.ord == 1]) == 1 ) qa_code="Pass"
   if (nrow(dt.ccf[lag == 0 & ccf.ord == 2]) == 1 & abs(dt.ccf[ccf.ord == 1]$acf.trt - dt.ccf[ccf.ord == 2]$acf.trt) <blcrit) qa_code="borderline"
   if (nrow(dt.ccf[lag == 0 & ccf.ord == 1]) == 0 & dt.ccf[ccf.ord == 1]$acf.trt / dt.ccf[ccf.ord == 2]$acf.trt > 2) qa_code="highpeak"
   if (nrow(dt.ccf[lag == 1 & ccf.ord == 1]) + nrow(dt.ccf[lag == -1 & ccf.ord == 1]) == 1) qa_code="pm1"
   dt.ccf$qa_code <- qa_code
+  }
   return(dt.ccf)
 }
 
