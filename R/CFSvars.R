@@ -25,7 +25,7 @@ meta.Sites <-data.table(Variable = c( "uid_site",  "site_id",    "latitude" ,   
                            Description = c("unique site identification used in treeSource",
                                            "original site identification",   "  decimal degrees (positive for N)",
                                   "decimal degrees (negative for W)", "inventory/target", "Investigators", "province iso code"),
-                           Required = c(0,1,1,1,2,2,1)
+                           Required = c(0,1,1,1,1,2,1)
 )
 
 
@@ -43,7 +43,7 @@ meta.Meas <-data.table(Variable = c( "uid_meas", "uid_tree",  "meas_no",   "meas
                        Description = c("unique measurement identification used in treeSource", "unique tree identification used in treeSource",
                                        "original measurement identification, 0 for missing info", "measurement date, last year in tree_RW in case missing",
                                        "health status: LIVE/DEAD","Stem diameter (cm) at breast height (ca. 1.3 m)", "Total tree height (m)"),
-                       Required = c(0,0,1,1,2,2,2)
+                       Required = c(0,0,2,2,2,2,2)
 )
 
 
@@ -57,18 +57,19 @@ meta.Samples <-data.table(Variable = c( "uid_sample", "uid_meas", "sample_id", "
 
 meta.Radius <-data.table(Variable = c( "uid_radius", "uid_sample", "radius_id", "cofecha_id", "ring_meas_method",
                                       "crossdating_visual", "crossdating_validation", "age_corrected", "bark_thickness_mm", "radius_inside_cm",
-                                      "dtc_measured_mm", "dtc_estimated_mm", "comments" ),
+                                      "dtc_measured_mm", "dtc_estimated_mm", "rw_ystart", "rw_yend",  "comments" ),
                            Format = c( "integer",  "integer", "character",  "character", "character",
                                        "logical", "character", "numeric",  "numeric", "numeric",
-                                        "numeric" , "numeric","character"),
+                                        "numeric" , "numeric", "numeric" , "numeric", "character"),
                            Description = c("unique radius/core identification used in treeSource", "unique sample identification used in treeSource",
                                           "original radius/core identification, \"O\" for missing", "identification used in cofecha",  "ring measurement method: windendro/velmex/coorecorder",
                                           "visaully cross-dated? yes/no", "validation cross-dated by: CDENDRO/COFECHA",
                                           "Corrected age (with rings added based on fresh DTC divided by fresh pith increment)",
                                           "thickness of the bark (mm)", "Core length corrected to Fresh tree dimensions outside bark (cm)",
                                           "Measured distance from start of earliest ring to centre (mm)",
-                                          "Gap-filled distance from start of earliest ring to centre (mm)","user notes on cores"),
-                           Required = c(0,0,1,2,2,2,2,2,2,2,2,2,2)
+                                          "Gap-filled distance from start of earliest ring to centre (mm)",
+                                          "starting year of the core", "ending year of the core", "user notes on the core"),
+                           Required = c(0,0,1,2,2,1,1,2,2,2,2,2,2,2,2)
                            )
 
 

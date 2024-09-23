@@ -1,6 +1,6 @@
 #' data spatial distribution by species measured later than certain year
 #'
-#' @param data :  input 2 tables: header and rw
+#' @param tr_meta :  meta table from CFS_format
 #' @param crit_yr : year criteria
 #' @param resol_lat :latitude resolution
 #' @param resol_lon :longitude resolution
@@ -15,10 +15,11 @@
 #' @import ggplot2
 #'
 #' @return 1 table species-lat * lon, values are number of uids
-#' @export count_uids
+#' @export CFS_freq
 #'
 
-count_uids <- function(data, crit_yr,resol_lat, resol_lon,  uid, N.species = 999, make.plot = TRUE, out.csv = FALSE, out.dir = NULL){
+CFS_freq <- function(tr_meta, crit_yr,resol_lat, resol_lon,  uid, N.species = 999, make.plot = TRUE, out.csv = FALSE, out.dir = NULL){
+  if (!(uid %in% c("uid_project", "uid_site", "uid_tree", "uid_meas", "uid_sample", "uid_radius"))) stop("uid should be in c('uid_project', 'uid_site', 'uid_tree', 'uid_meas', 'uid_sample', 'uid_radius')")
   # if (length(data) == 1){
   #
   #   # separate the data into 2
@@ -36,22 +37,22 @@ count_uids <- function(data, crit_yr,resol_lat, resol_lon,  uid, N.species = 999
   #
   # }
   # if (length(data)  == 2) {
-  if (length(data) != 2) {
-    print(length(data))
-    stop("pls verify data only with 2 tables in the form list(tab1, tab2)")
-  }
-  if (nrow(data[[1]]) > nrow(data[[2]])) {
-    dt.meta <- data[[2]]
-    dt.rwl <- data[[1]]
-  }else{
-    dt.meta <- data[[1]]
-    dt.rwl <- data[[2]]
-  }
+  # if (length(data) != 2) {
+  #   print(length(data))
+  #   stop("pls verify data only with 2 tables in the form list(tab1, tab2)")
+  # }
+  # if (nrow(data[[1]]) > nrow(data[[2]])) {
+  #   dt.meta <- data[[2]]
+  #   dt.rwl <- data[[1]]
+  # }else{
+  #   dt.meta <- data[[1]]
+  #   dt.rwl <- data[[2]]
+  # }
   # }
 
-ylast <- dt.rwl[, .(ylast= max(year)), by = .(uid_radius)][ylast >= crit_yr]
+# ylast <- dt.rwl[, .(ylast= max(year)), by = .(uid_radius)][ylast >= crit_yr]
 
-dt.meta.sel <- dt.meta[, c(unique(c("uid_radius", uid)), "longitude", "latitude",  "species"), with = FALSE][ylast, on = .(uid_radius)]
+dt.meta.sel <- tr_meta[rw_yend >= crit_yr, c(unique(c("uid_radius", uid)), "longitude", "latitude",  "species"), with = FALSE]
 dt.meta.sel[, lat:= round(latitude/resol_lat, 0)*resol_lat]
 dt.meta.sel[,lon:=round(longitude/resol_lon, 0)*resol_lon]
 
@@ -107,8 +108,8 @@ if (out.csv == TRUE){
 return(dist_uids)
 }
 #
-# dist_samples <- count_uids(list(dt.rwl, dt.meta), 1990,5, 10,  "uid_sample", 3)
-# dist_sites <- count_uids(list(dt.rwl.all, dt.meta.all), 2000,5, 5,  "uid_site", 5)
+# dist_samples <- CFS_freq(list(dt.rwl, dt.meta), 1990,5, 10,  "uid_sample", 3)
+# dist_sites <- CFS_freq(list(dt.rwl.all, dt.meta.all), 2000,5, 5,  "uid_site", 5)
 
 # data <- list(dt.rwl.all, dt.meta.all)
 

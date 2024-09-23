@@ -34,7 +34,7 @@ plot_results <- function(plot.lst, out_series = "A", out_N = NULL, outpdf_YN ,ou
   }
   if ((out_series) == "P"){
     if (is.null(out_N)) stop("out_N cannot be null to output random-selected") else
-      idx.lst <- idx.all
+      idx.lst <- out_N
   }
 
 

@@ -7,7 +7,7 @@
 CFS_format(data, out.csv = FALSE, out.dir = NULL)
 }
 \arguments{
-\item{data}{: input data in wide format}
+\item{data}{: a list, first is input data in wide format; second is a flat sequence referring to the column indices of meta variables}
 
 \item{out.csv}{: output csv file (TRUE or FALSE)}
 

@@ -21,4 +21,6 @@ Imports:
   nlme(>= 3.0.0),
   purrr(>= 1.0.0),
   parallel(>= 4.0.0),
-  grDevices(>= 4.0.0)
+  grDevices(>= 4.0.0),
+  RANN(>= 2.0.0),
+  patchwork(>= 1.0.0)
