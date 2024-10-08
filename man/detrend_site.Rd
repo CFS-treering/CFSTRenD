@@ -6,6 +6,7 @@
 \usage{
 detrend_site(
   data,
+  resp_scale = "log",
   mtd,
   m.candidates,
   out.mod = FALSE,
@@ -15,6 +16,8 @@ detrend_site(
 }
 \arguments{
 \item{data}{: datatable}
+
+\item{resp_scale}{log or original scale of bai}
 
 \item{mtd}{: method ML or REML}
 

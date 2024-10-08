@@ -10,6 +10,7 @@ CFS_freq(
   resol_lat,
   resol_lon,
   uid,
+  spc.lst,
   N.species = 999,
   make.plot = TRUE,
   out.csv = FALSE,
@@ -26,6 +27,8 @@ CFS_freq(
 \item{resol_lon}{:longitude resolution}
 
 \item{uid}{: counts on which uid}
+
+\item{spc.lst}{species list}
 
 \item{N.species}{: number of top species to be output (999 for all)}
 

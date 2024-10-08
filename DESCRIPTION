@@ -24,3 +24,7 @@ Imports:
   grDevices(>= 4.0.0),
   RANN(>= 2.0.0),
   patchwork(>= 1.0.0)
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

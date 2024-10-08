@@ -261,14 +261,14 @@ CFS_scale <- function(site2chk, tr_all_wide, ver.tr = "V1.2",  N.nb){
   rw.all.spc <- merge(tr_all_wide, site.all.spc[, c("uid_project", "uid_site", "species")], by = c("uid_project", "uid_site", "species"))
 
   closest <- RANN::nn2(site.all.spc[,c("longitude", "latitude")], site2chk[ ,c("longitude", "latitude")], k = N.nb + 1)
-  plot(1:length(closest$nn.dists), closest$nn.dists)
+  # plot(1:length(closest$nn.dists), closest$nn.dists)
   uid_site.closest <- data.table(ord = 0:N.nb, uid_project = site.all.spc$uid_project[closest$nn.idx], uid_site = site.all.spc$uid_site[closest$nn.idx], nn.dists = as.numeric(closest$nn.dists))
   uid_site.closest <- merge(uid_site.closest, site.all.spc[, c("uid_project", "uid_site", "longitude", "latitude")], by = c("uid_project", "uid_site"))
 
   uid_radius.chk <- merge(rw.all.spc, uid_site.closest[, c("uid_project", "uid_site")], by = c("uid_project", "uid_site"))
   if (ncol(tr_all_wide) != ncol(uid_radius.chk)) stop("check the colname of uid_radius.chk")
-  uid_radius.chk <- cbind(uid_radius.chk[, c("uid_project", "uid_site", "species", "uid_radius")], uid_radius.chk[, 42: ncol(uid_radius.chk)])
-  uid_radius.chk.long <- melt(uid_radius.chk, id.vars = c( "species", "uid_project", "uid_site", "uid_radius"))[!is.na(value)]
+  uid_radius.chk <- cbind(uid_radius.chk[, c("uid_project", "uid_site", "species", "uid_radius")], uid_radius.chk[, 45: ncol(uid_radius.chk)])
+  uid_radius.chk.long <- melt(uid_radius.chk, id.vars = c( "species", "uid_project", "uid_site", "uid_radius"))[!is.na(value)][value > 0]
   uid_radius.chk.long[, year:= as.numeric(as.character(variable))]
   med.radius <- uid_radius.chk.long[, .(N = .N, rw.median = median(value), yr.mn = min(year), yr.max = max(year)), by = .(species, uid_project, uid_site, uid_radius)]
   med.site <- med.radius[, .(Ncores = .N, rw.median = median(rw.median), yr.mn = min(yr.mn), yr.max = max(yr.max)), by = .(species, uid_project, uid_site)]

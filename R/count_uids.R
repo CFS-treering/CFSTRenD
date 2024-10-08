@@ -5,6 +5,7 @@
 #' @param resol_lat :latitude resolution
 #' @param resol_lon :longitude resolution
 #' @param uid : counts on which uid
+#' @param spc.lst species list
 #' @param N.species : number of top species to be output (999 for all)
 #' @param make.plot plot the distribution (TRUE or FALSE)
 #' @param out.csv : output csv file (TRUE or FALSE)
@@ -18,7 +19,7 @@
 #' @export CFS_freq
 #'
 
-CFS_freq <- function(tr_meta, crit_yr,resol_lat, resol_lon,  uid, N.species = 999, make.plot = TRUE, out.csv = FALSE, out.dir = NULL){
+CFS_freq <- function(tr_meta, crit_yr,resol_lat, resol_lon,  uid, spc.lst, N.species = 999, make.plot = TRUE, out.csv = FALSE, out.dir = NULL){
   if (!(uid %in% c("uid_project", "uid_site", "uid_tree", "uid_meas", "uid_sample", "uid_radius"))) stop("uid should be in c('uid_project', 'uid_site', 'uid_tree', 'uid_meas', 'uid_sample', 'uid_radius')")
   # if (length(data) == 1){
   #
@@ -62,8 +63,11 @@ setorder(uids.spc, -N)
 uids.spc[, pct.species := N/sum(N)]
 uids.spc[, pct.species := round(pct.species * 100,0)]
 uids.spc[, ord:= .I]
-
-uids.sel <- uids.sll[uids.spc[ord <= N.species][,c("species", "pct.species", "N", "ord")], on = .(species)]
+if (!is.null(spc.lst)) {
+  N.species <- NULL
+  uids.sel <- uids.sll[uids.spc[species %in% spc.lst][,c("species", "pct.species", "N", "ord")], on = .(species)]
+}
+if (!is.null(N.species)) uids.sel <- uids.sll[uids.spc[ord <= N.species][,c("species", "pct.species", "N", "ord")], on = .(species)]
 dist_uids <- uids.sel[, .(nuids = .N), by = .(ord, species, pct.species, N, lat, lon)]
 if (make.plot){
   data.tmp <- dist_uids[ord <10]

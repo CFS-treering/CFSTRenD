@@ -19,6 +19,7 @@
 #' detrending BAI using gamm model with family = Gamma(link='log') and corAR1."REML" and "ML" methods are available.It can be used to compare models with aic using "ML" method.
 #'
 #' @param data : datatable
+#' @param resp_scale log or original scale of bai
 #' @param mtd : method ML or REML
 #' @param m.candidates : the list of RHS of formulas
 #' @param out.mod : output gamm object (TRUE or FALSE)
@@ -38,17 +39,25 @@
 #' @export detrend_site
 #'
 
-detrend_site <- function(data, mtd, m.candidates, out.mod = FALSE, out.csv = FALSE, out.dir = NULL){
+detrend_site <- function(data, resp_scale = "log", mtd, m.candidates, out.mod = FALSE, out.csv = FALSE, out.dir = NULL){
+  if (resp_scale == "log") {
+
+    famil = gaussian("identity")
+  }else {
+    famil = Gamma("log")
+  }
   # for comparing and selecting model on AIC
   if (mtd == "ML" & length(m.candidates) > 1){
 for (i in 1:length(m.candidates)){
+  formul <- as.formula(m.candidates[i])
+  if (resp_scale == "log") formul <- update(formul, log(.) ~ .)
 
-  m.tmp <- gamm(as.formula(m.candidates[i]),
+  m.tmp <- gamm(formul,
                    random = list(uid_tree.fac=~1), correlation = corCAR1(value = 0.5),
-                   method = mtd,family = Gamma(link='log'), data = data)
+                   method = mtd,family = famil, data = data)
 
 
-  aic.tmp <- data.table(i = i, form = m.candidates[i], aic =  AIC(m.tmp$lme), R2 = summary(m.tmp$gam)$r.sq, methd = mtd)
+  aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp$lme), R2 = summary(m.tmp$gam)$r.sq, methd = mtd)
 
 
   if (i == 1) {
@@ -90,12 +99,13 @@ write.csv(aic.all, file =  file.path(out.dir, paste0("fitting ", mtd ,".csv")), 
     return()}
 if(mtd == "REML" & length(m.candidates) == 1) {
   # for 1 equation only
-  form.sel <- m.candidates
+  form.sel <- as.formula(m.candidates)
+  if (resp_scale == "log") form.sel <- update(form.sel, log(.) ~ .)
 }
   # fitting REML for prediction
-  m.sel <- gamm(as.formula(form.sel),
+  m.sel <- gamm(form.sel,
                 random = list(uid_tree.fac=~1), correlation = corCAR1(value = 0.5),
-                method = "REML",family = Gamma(link='log'), data = data)
+                method = "REML",family = famil, data = data)
 
   if (out.mod) saveRDS(m.sel, compress = TRUE, file =   file.path(out.dir, paste0("sel.mod_REML",".rds")))
 
@@ -123,6 +133,8 @@ if(mtd == "REML" & length(m.candidates) == 1) {
         fit.s.ageC - qnorm(0.975) * se.fit.s.ageC,
         fit.s.ageC + qnorm(0.975) * se.fit.s.ageC)]
     # }
+      if (resp_scale == "log") setnames(tmp.bai, c("fit.bai", "se.fit.bai", "res.bai", "lci_bai", "uci_bai"), c("fit.logbai", "se.fit.logbai", "res.logbai", "lci_logbai", "uci_logbai"))
+
   # for (iclim.test in c("VPDsummer","VPDprevsummer" )){
   # fit.s.clim <- paste0("fit.s.", iclim.test, "..species.fac")
   # if (any(unique(str_detect(names(tmp.bai), fit.s.clim)) == TRUE)){
@@ -140,7 +152,7 @@ if(mtd == "REML" & length(m.candidates) == 1) {
 
   ptable <- data.table(Parameter = row.names(summary(m.sel$gam)$p.table), summary(m.sel$gam)$p.table )
   stable <- data.table(Parameter = row.names(summary(m.sel$gam)$s.table), summary(m.sel$gam)$s.table)
-  aic.reml <- data.table(form = form.sel, aic =  AIC(m.sel$lme), R2 = summary(m.sel$gam)$r.sq, methd = "REML")
+  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel$lme), R2 = summary(m.sel$gam)$r.sq, methd = "REML")
 
   if (out.csv == TRUE){
   if (is.null(out.dir)) message("please provide the directiory to output csv files")  else{

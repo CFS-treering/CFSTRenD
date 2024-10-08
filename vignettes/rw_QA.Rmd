@@ -1,0 +1,76 @@
+---
+title: "rw_QA"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{rw_QA}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Introduction
+This is an introduction to quality assurance procedure originally developed by Juha and modified by XiaoJing Guo. tree ring measurement is well-known for its measurement quality issues. we present here a simple algorithm to identity the measurement accuracy. We used the difference of 2 consecutive tree ring measurement, and the criteria of success is, the max correlation occurs at lag0. the algorithm includes 2 steps: 1: running pair-wise ccf on the series of difference on all samples; the inital master chrology was obtained by the arithmetic mean of the difference series of all the samples that met the criteria in step 1; 2: running ccf on each samples with master chronology, the samples not meeting the criteria will be removed from the master chronology, until the ccf of all the samples in master chronology with the master chronlogy meets the criteria. based on where the maximum ccf lag, We classified the series into 4 category:
+
+1: pass; the samples well passed the test;
+2: PM1: max ccf occurs at lag 1 or -1
+3: highpeak;
+4: Fail.
+
+It's up to user to determine the data collection to run this procedure, for CFS-TRenD data, we used per eco-region. this column appears in table tr_6_radius:  
+
+the The procedure includes 2 steps:
+ 1. 
+The input is the tree-ring list with 3 mandatory columns: "SampleID", "Year" and "RawRing".
+
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(CFSTRenD)
+```
+# Step 0: reading data
+```{r}
+library(data.table)
+library(CFSTRenD)
+library(ggplot2)
+dir.src <- "P:/Jing/2010-08/Martin/Treering_bank/TR_QA_Example_Juha/"
+
+TreeData=fread(paste(dir.src,"RW_Hember.csv",sep=""))
+
+# rename the column containing the data from "TRW" to "RawRing"
+setnames(TreeData, "TRW", "RawRing")
+#
+# note that there were some duplicate "New_ID" so I had to add ID_Inst to New_ID to create a new unique ID that is called "SampleID"
+TreeData[, SampleID := paste(ID_Inst,New_ID,sep="_")]
+#
+# Make a plot of all the raw data to see what it looks like
+
+ggplot(TreeData,aes(x=Year,y=RawRing))+geom_line(show.legend=FALSE)
+# ggplot(TreeData,aes(x=Year,y=RawRing,group=SampleID,color=factor(SampleID)))+geom_line(show.legend=FALSE)
+# +scale_color_viridis(discrete=TRUE)
+#
+```
+
+
+# step 1: prepare required data format (wide and long format)
+```{r}
+dt.input <- pre_dataFormat(TreeData)
+```
+The object dt.input contains 3 tables, tree ring in long format, tree ring measurement in wide format, and treated tree ring series (difference) in wide format, the last item of dt.input is the sample list. These outputs will be used in the QA algorithm.
+
+# step 2: main: data quality classification
+```{r}
+master.trt.ccf <-tr_fullmaster(dt.input)
+```
+# step 3: generate plots
+```{r}
+plot.lst <- generate_plots(master.trt.ccf, dt.input)
+```
+# step 4: present results
+```{r}
+plot_results(plot.lst, out_series = "R", out_N = 1, outpdf_YN = "N" ,outpdf_fn = "c:/tmp/qa_ccf.pdf" )
+```

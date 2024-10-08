@@ -53,7 +53,7 @@ plot_results <- function(plot.lst, out_series = "A", out_N = NULL, outpdf_YN ,ou
     }
 
   # Close the PDF device
-  dev.off()
+  if (toupper(outpdf_YN) == "Y") dev.off()
 }
 
 # pre data for plotting series vs year
@@ -125,10 +125,10 @@ create_plot.series <- function(icol, data) {
   if (str_detect(deparse(substitute(data)), "trt")) label <- "treated" else label <- "raw"
   sampleID<- names(data)[icol]
   p <- ggplot(data, aes(x = Year)) +
-    geom_line(aes(y = get(sampleID), color = 'Tree')) +
-    geom_point(aes(y = get(sampleID), color = 'Tree'), shape = 21, size = 2, fill = "white") +
-    geom_line(aes(y = get(names(data)[2]), color = 'Master')) +
-    geom_point(aes(y = get(names(data)[2]), color = 'Master'), shape = 21, size = 2, fill = "white") +
+    geom_line(aes(y = get(sampleID), color = 'Tree'), na.rm = TRUE) +
+    geom_point(aes(y = get(sampleID), color = 'Tree'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
+    geom_line(aes(y = get(names(data)[2]), color = 'Master'), na.rm = TRUE) +
+    geom_point(aes(y = get(names(data)[2]), color = 'Master'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
     labs(title = paste(label," ", str_sub(sampleID, 3)),
          x = "Year", y = paste0(label, " rw"),
          color = "Series") +
@@ -164,7 +164,7 @@ create_barplot <- function(icol, data) {
 
   # Create the bar plot
   p <- ggplot(data, aes(x = as.factor(lag), y = get(sampleID), fill = as.factor(lag))) +
-    geom_bar(stat = "identity") +
+    geom_bar(stat = "identity",na.rm = TRUE) +
     scale_fill_manual(values = clrs) +
     # scale_fill_manual(values = clrs) +
     labs(title = paste("ccf_", label, " ", str_sub(sampleID.o, 3), " ", test),
