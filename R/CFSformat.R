@@ -1,9 +1,9 @@
 
 #' convert data to CFS-TRenD format
 #'
-#' @param data : a list, first is input data in wide format; second is a flat sequence referring to the column indices of meta variables
-#' @param out.csv : output csv file (TRUE or FALSE)
-#' @param out.dir : directory of output csv files
+#' @param data  a list, first is input data in wide format; second is a flat sequence referring to the column indices of ring measurement variables
+#' @param out.csv  output csv file (TRUE or FALSE)
+
 
 #'
 #' @import data.table
@@ -14,26 +14,19 @@
 #'
 
 #'
-CFS_format <- function (data, out.csv = FALSE, out.dir = NULL) {
+CFS_format <- function (data, out.csv = FALSE) {
   if (length(data) != 2) {
     print(length(data))
-    stop("pls verify data is a list with 2 items, first is input data in wide format; second is a flat sequence referring to the column indices of meta variables")
+    stop("pls verify data is a list with 2 items, first is input data in wide format; second is a flat sequence referring to the column indices of ring measurement variables")
   }
   if (!(is.data.frame(data[[1]])| is.data.table(data[[1]]))) stop("the first item of data must be the complete data in wide format")
-  if (is.list(data[[2]] | is.null(data[[2]]) | class(data[[2]]) != "integer" )) stop("the second item of data must be a flat sequence referring to the column indices of meta variables")
+  if (is.list(data[[2]] | is.null(data[[2]]) | class(data[[2]]) != "integer" )) stop("the second item of data must be a flat sequence referring to the column indices of ring measurement variables")
 
-    # {
 
-    # if (is.null(N.cols_meta)) {
-    #   stop("need to identify the columns of meta data")
-    #   return()
-    # }else{
-
-      # setDT(data)
       names.data.o <- names(data[[1]])
       if (any(str_detect(names.data.o, "uid_radius.tmp"))) stop("please rename the column 'uid_radius.tmp'")
 
-      cols_rw <- names.data.o[-data[[2]]]
+      cols_rw <- names.data.o[data[[2]]]
       # check if all numbers
       # # is_numeric <- grepl("^[0-9]+$", x)
       # if ( all(grepl("^[0-9]+$", cols_rw))) {
@@ -53,32 +46,14 @@ CFS_format <- function (data, out.csv = FALSE, out.dir = NULL) {
        # separate the data into 2
 
     # meta data
-    dt.meta <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,data[[2]]])
+    dt.meta <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,-data[[2]]])
     # tree ring
-    dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,-data[[2]]])
+    dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,data[[2]]])
 
     dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp"))[!is.na(value)]
     setnames(dt.rwl, "value", "rw_mm")
     dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
 
-  # }
-  # }
-  # else
-  # {
-  # if (length(data) != 2) {
-  #   print(length(data))
-  #   stop("pls verify data only with 2 tables in the form list(tab1, tab2)")
-  #   }
-  #   if (nrow(data[[1]]) > nrow(data[[2]])) {
-  #     dt.meta <- data[[2]]
-  #     dt.rwl <- data[[1]]
-  #   }else{
-  #     dt.meta <- data[[1]]
-  #     dt.rwl <- data[[2]]
-  #   }
-  #   if (!any(str_detect(names(dt.meta), "id_radius.tmp")) ) stop("please add column id_radius.tmp in metadata")
-  #   if (!any(str_detect(names(dt.rwl), "id_radius.tmp")) ) stop("please add column id_radius.tmp in rw measurement")
-  # # }
 
   meta.all0 <- variables.cfstrend()
   meta.all <- meta.all0[!str_detect(Variable, "uid_")]
@@ -178,70 +153,36 @@ if (length(add.Vars) > 0) {
   # dt.new <- merge(dt.new, ylast, by = "uid_radius")
   tr_all_wide <- dcast(tr_7_ring_widths, uid_radius ~ year, value.var = "rw_mm")
   tr_all_wide <- merge(dt.new, tr_all_wide, by = "uid_radius")
-  if (out.csv == TRUE){
-    if (is.null(out.dir)) message("please provide the directiory to output csv files")  else{
-      if (!(dir.exists(out.dir))) dir.create(out.dir, recursive = TRUE)
+  if (!is.null(out.csv)){
+
+      if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
+
       for (i.tbl in 1:7){
-        write.csv(eval(parse(text = fn7[i.tbl])), file =file.path(out.dir, paste0(fn7[i.tbl], ".csv" )), na = "",  row.names = FALSE)
+        write.csv(eval(parse(text = fn7[i.tbl])), file =file.path(out.csv, paste0(fn7[i.tbl], ".csv" )), na = "",  row.names = FALSE)
 
       }
-      write.csv(complete_vars, file =file.path(out.dir, paste0("complete_vars", ".csv" )), na = "",  row.names = FALSE)
+      write.csv(complete_vars, file =file.path(out.csv, paste0("complete_vars", ".csv" )), na = "",  row.names = FALSE)
       save(tr_all_wide, file =paste0("tr_all_wide", ".Rdata" ))
       }
-    }
+
 
   # return(list(tr_1_projects = tr_1_projects, tr_2_sites= tr_2_sites, tr_3_trees = tr_3_trees, tr_4_meas = tr_4_meas, tr_5_samples = tr_5_samples,
   #              tr_6_radiuses = tr_6_radiuses,  tr_7_ring_widths = tr_7_ring_widths, tr_all_wide = tr_all_wide, tr_meta = dt.new, complete_vars = complete_vars)
   #        )
 
-  return(list(  tr_rw_long = tr_7_ring_widths, tr_all_wide = tr_all_wide, complete_vars = complete_vars)
+  return(list(  tr_all_long = list(tr_1_projects = tr_1_projects, tr_2_sites= tr_2_sites, tr_3_trees = tr_3_trees, tr_4_meas = tr_4_meas, tr_5_samples = tr_5_samples,
+                                                tr_6_radiuses = tr_6_radiuses,  tr_7_ring_widths = tr_7_ring_widths), tr_all_wide = tr_all_wide, complete_vars = complete_vars)
   )
 
 }
 
-#' seperate 1 table into 2: dt.meta and dt.rwl with the link id_radius.tmp
-#'
-#' @param data : dataframe or datatable in wide format
-#' @param N.cols_meta : all column index except ring measurement
-#' @import data.table
-#' @import stringr
-#' @return 2 tables: dt.meta and dt.rwl
-#' @export dt.sep2
-#'
-
-dt.sep2 <- function(data, N.cols_meta=NULL){
-
-  if (is.null(N.cols_meta)) stop("pls specify the column index of meta data")
-    setDT(data)
-  names.data <- names(data)
-  cols_rw <- names.data[-N.cols_meta]
-  if (any(names.data[N.cols_meta] == "uid_radius")) uidr.tmp <- "uid_radius" else {uidr.tmp <-"uid_radius.tmp"
-   data[,uid_radius.tmp:= .I]}
-  # separate the data into 2
-
-    # meta data
-  if (any(names.data[N.cols_meta] == "uid_radius")) dt.meta <- data[, c(names.data[N.cols_meta]), with = FALSE] else
-    dt.meta <- data[, c(uidr.tmp,names.data[N.cols_meta]), with = FALSE]
-
-  # tree ring
-  # summary(data$uid_radius.tmp)
-  dt.tr <- data[, c(uidr.tmp,cols_rw), with = FALSE]
-
-  dt.rwl <- melt(dt.tr, id.vars = c(uidr.tmp))[!is.na(value)]
-  setnames(dt.rwl, "value", "rw_mm")
-  dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
-  dt.rwl <- dt.rwl[ ,c(uidr.tmp, "year", "rw_mm"), with = FALSE]
-  return(list(dt.meta = dt.meta, dt.rwl = dt.rwl))
-}
-
-
 
 #' plot the median of tree ring measurement of 1 site and of its nearest neighbors
 #'
-#' @param site2chk : data.table with columns uid_project, uid_site, site_id, species, longitude and latitude
-#' @param tr_all_wide : reference sites including including rw measurement in wide format
-#' @param ver.tr : release version of CFS-TRenD
-#' @param N.nb : number of nearest-neighbors
+#' @param site2chk  data.table with columns uid_project, uid_site, site_id, species, longitude and latitude
+#' @param tr_all_wide  reference sites including including rw measurement in wide format
+#' @param N.nb  number of nearest-neighbors
+#' @param make.plot  plot figures (default: FALSE)
 #'
 #' @import data.table
 #' @import stringr
@@ -253,7 +194,7 @@ dt.sep2 <- function(data, N.cols_meta=NULL){
 
 #'
 
-CFS_scale <- function(site2chk, tr_all_wide, ver.tr = "V1.2",  N.nb){
+CFS_scale <- function(site2chk, tr_all_wide, N.nb, make.plot = FALSE){
   # scale
   if (nrow(site2chk) > 1) stop("we can only process 1 species in 1 site each time ...")
 
@@ -281,11 +222,11 @@ CFS_scale <- function(site2chk, tr_all_wide, ver.tr = "V1.2",  N.nb){
   setorder(med.site.yr, ord, uid_project, uid_site, year)
 
 
-
+  if (make.plot == TRUE){
   g2 <- ggplot(med.site.yr, aes(x = year, y = rw.median, group = uid_site)) +
     geom_line(aes(color = factor(ifelse(ord == 0, "red", "darkblue"))), alpha = 0.6) +
     scale_color_manual(values = c("red" = "red", "darkblue" = "darkblue"),
-                       labels = c("red" = "Site to Check", "darkblue" = "Neighbours"),
+                       labels = c("red" = "Site", "darkblue" = "Nbs"),
                        name = "") +
     theme(legend.position = "right",
           plot.caption = element_text(hjust = 0, face = "italic")) +  # Position the legend on the right
@@ -293,7 +234,7 @@ CFS_scale <- function(site2chk, tr_all_wide, ver.tr = "V1.2",  N.nb){
     labs(title = paste0( site2chk$site_id, " (",  site2chk$species, ")" ),
 
          y = "rw.median(mm)",
-         caption = paste0("Data source: CFS-TRenD ", ver.tr)  # Add the data source caption
+         caption = paste0("Data source: CFS-TRenD V1.2")  # Add the data source caption
     )
 
 
@@ -323,5 +264,54 @@ CFS_scale <- function(site2chk, tr_all_wide, ver.tr = "V1.2",  N.nb){
   # hjust = 0.5, vjust = -1, check_overlap = TRUE)
 
   # gridExtra::grid.arrange(g2, g1, ncol = 2)
-  g2 + g1 + plot_layout(widths = c(2, 1))
+  print(g2 + g1 + plot_layout(widths = c(1.2, 1)))
+  }
+  chk.site<- data.table(chk.site = site2chk$uid_site, chk.species = site2chk$species, chk.site)
+  return(chk.site)
 }
+
+
+#' frequency distributions based on species and geo-location
+#'
+#' @param tr_meta   meta table from function CFS_format()
+#' @param uid_level which uid level to count(uid_project, uid_site, uid_tree, uid_meas, uid_sample, uid_radius)
+#' @param cutoff_yr cut-off year from which series were recorded on or after
+#' @param geo_resolution resolution of longitude and latitude in degree, default: c(5,5)
+
+
+#' @import data.table
+#' @import stringr
+#' @import ggplot2
+#'
+#' @return a data table of counts of uid by species-lat * lon
+#' @export CFS_freq
+#'
+
+CFS_freq <- function(tr_meta,  uid_level, cutoff_yr,geo_resolution = c(5,5)){
+  if (!(uid_level %in% c("uid_project", "uid_site", "uid_tree", "uid_meas", "uid_sample", "uid_radius"))) stop("uid_level should be in c('uid_project', 'uid_site', 'uid_tree', 'uid_meas', 'uid_sample', 'uid_radius')")
+
+
+  dt.meta.sel <- tr_meta[rw_yend >= cutoff_yr, c(unique(c("uid_radius", uid_level)), "longitude", "latitude",  "species"), with = FALSE]
+  dt.meta.sel[,lon:=round(longitude/geo_resolution[1], 0)*geo_resolution[1]]
+  dt.meta.sel[, lat:= round(latitude/geo_resolution[2], 0)*geo_resolution[2]]
+
+  uids.sll <- dt.meta.sel[, .N, by = c("lat", "lon", "species", uid_level)][,N:= NULL]
+  uids.spc <- uids.sll[,.N, by = .(species)]
+  setorder(uids.spc, -N)
+  uids.spc[, pct.species := N/sum(N)]
+  uids.spc[, pct.species := round(pct.species * 100,0)]
+  uids.spc[, ord:= .I]
+  uids.sll <- uids.sll[uids.spc[,c("species", "pct.species", "N", "ord")], on = .(species)]
+
+  dist_uids <- uids.sll[, .(nuids = .N), by = .(ord, species, pct.species, N, lat, lon)]
+
+
+  dist_uids <- dcast(dist_uids, ord + species + N + pct.species + lat ~ lon, value.var = "nuids")
+  dist_uids <- data.table(uid_label = paste0(uid_level, "_yr", cutoff_yr), dist_uids)
+  setorder(dist_uids, -pct.species, species, -lat)
+
+
+  return(dist_uids)
+}
+
+

@@ -1,11 +1,10 @@
 Package: CFSTRenD
 Type: Package
-Title: process tree ring dataset in CFS-TRenD format
+Title: a comprehensive toolkit for data processing, quality assessment and statistical analysis with tree-ring data
 Version: 0.1.0
 Author: Xiao Jing Guo
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Maintainer: The package maintainer <xiaojing.guo@NRCan-RNCan.gc.ca>
+Description: CFSTRenD R package is aimed at streamlining the processing and analysis of tree-ring data. Key features include: 1) manipulation and summarization of tree-ring data; 2) data quality identification and classification; and 3) a flexible detrending and climate-growthmodel based on generalized additive mixed models (GAMM); 4) model selection tool based on Akaike Information Criterion (AIC). Additionally, the package supports generating multiple plots for visual inspection and handles .rwl format files, offering a comprehensive toolkit for CFS-TRenD community and dendrochronologists.
 License: GPL-3 
 Encoding: UTF-8
 LazyData: true

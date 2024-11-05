@@ -4,7 +4,7 @@
 #' @import data.table
 #' @import stringr
 #'
-#' @return two lists: meta.all and ord.all
+#' @return a data table of variable descriptions of all tables
 #' @export
 #'
 #' @examples

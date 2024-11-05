@@ -1,0 +1,386 @@
+
+
+# functions
+
+
+# step 1: pair-wise ccf on all the samples. find all pairs that satisfies the condition that max_ccf @lag0
+#   the results of this step serves as the initial sample list of master chronology for step 2
+# step 2: run ccf between each sample and the mean of initial master chronology
+#   this step is to check ccf between each sample and the the mean master chronology,
+#   the results is the final master chronology satisfying the condition that max_ccf @lag0 with each sample that form the master
+#   the out table contains the correlation with master at lag0 and its rank(from 1 to 21, 1 represents the maximum one, 21 represents minimum),
+#   qa_code(Pass, borderline, highpeak, pm1) for each sample
+
+
+#' tree ring data quality classification and master chronology
+#' @description
+#' classify tree ring data in five classes ("pass","borderline", "pm1", "highpeak", "fail") using the difference series.
+#'
+#' @param dt.input tree ring data with at least 3 columns (SampleID, Year, RawRing)
+#' @param mtd.paired_ccf processing approach for paired ccf c("S", "LB", "LP")
+#' @param batch_size  batch size for processing large dataset
+#' @param max.lag maximum lag for ccf
+#' @param max.trial maximum loop for step 2 to form the master dendrochronology
+
+#'
+#'
+#'
+#' @rawNamespace import(purrr, except = c(transpose))
+#' @import data.table
+#' @import parallel
+#'
+#' @return
+#' dt.ccf:	A data table containing the CCF results for all samples, including the quality assessment code (qa_code).
+#'
+#' master:	The final master chronology, including both raw master chronology, the mean of ring measurement of the series with pass, and the treated  master chronology, calculated as the difference of two consecutive raw master chronology.
+
+#'
+#' plot.lst:	plots of the raw and treated ring measurements with year, along with the CCF plots for each sample.
+
+
+#'
+#' @details We present a simple algorithm to assess measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
+#  the term CCF for cross-correlation function with a window of 10 lags; and the term “meet the criteria” for the maximum correlation occurs at lag 0 of CCF.
+#' The algorithm consists of two main steps:
+#'
+#'  Step 1. Initial treated master chronology
+#'
+#'  Perform pairwise CCF on the treated series of all possible combinations of the samples.
+#'  The pair which meets the criteria is qualified for the master chronology calculation.
+#'  We then calculate the raw ring master chronology by averaging the ring measurements of these selected samples.
+#'  The difference series of the raw ring master chronology is used as the initial treated master chronology for next step.
+#'
+#'  Step 2. Refinement on Master Chronology
+#'
+#'  Perform CCF between the treated series of each sample and the initial treated master chronology.
+#'  Samples that do not meet the criteria will be removed from the recalculation of the treated master chronology.
+#'
+#'  This step is repeated until all remaining samples in the master chronology meet the criteria.
+#'
+#' This process results in five categories classification for all samples (pass, borderline, pm1, highpeak, fail)
+
+#' @export CFS_qa
+#'
+
+CFS_qa <- function(dt.input , mtd.paired_ccf = "S", batch_size = 5000, max.lag = 10, max.trial = 100){
+
+  if (length(setdiff(c("SampleID", "Year","RawRing" ), names(dt.input))) > 0) stop("at least one of the mandatory columns (SampleID, Year, RawRing) doesn't exist, please check...")
+
+
+  if (nrow(dt.input[, .N, by = .(SampleID, Year)][N > 1]) > 0) stop("SampleID-Year is not unique key, please check...")
+  dt.rw_long <- dt.input[, c("SampleID", "Year","RawRing" )]
+  setorder(dt.rw_long, SampleID,Year)
+  # the series to be used for ccf
+  dt.rw_long[, rw.treated:= RawRing - shift(RawRing), by = SampleID]
+
+  # SampleID.chr is the key sampleID, we use it in the functions to represent a sample.
+  # starting with a character to ensure the validity as column name and value of a column
+
+  dt.rw_long[, SampleID.chr:= paste0("d_", SampleID)]
+  setorder(dt.rw_long, SampleID.chr)
+  sample.lst <- sort(unique(dt.rw_long$SampleID.chr))
+
+  dt.rw_wide <- dcast(dt.rw_long[!is.na(rw.treated)], Year ~ SampleID.chr, value.var = "RawRing")
+  dt.trt_wide <- dcast(dt.rw_long[!is.na(rw.treated)], Year ~ SampleID.chr, value.var = "rw.treated")
+
+  setcolorder(dt.trt_wide, c("Year", sample.lst))
+
+
+
+  dt.trt_wide.o <- copy(dt.trt_wide); dt.trt_wide$Year <- NULL;
+  if (!(mtd.paired_ccf %in% c("S", "LB", "LP"))) stop("please specify mtd.paired_ccf as one of c('S', 'LB', 'LP')")
+  # dt.trt_wide: treated series in wide format for pair-wise ccf
+  # dt.rw_long: ring width series in long format for calculating mean of master chronology
+
+  # step 1: pair-wise ccf to find all the samples which can find at least 1 sample to reach max_ccf @ lag0
+
+  # Generate all pairs of columns
+  col_pairs <- combn(names(dt.trt_wide), 2, simplify = FALSE)
+
+  # Use map to calculate pairwise cross-correlation for each pair
+  # this is the most efficient way for this calculation so far i found, 20-06-24, 2 mins for 490 series
+  # system.time(ccf.pairs <- map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]])))
+
+
+  # ccf.pairs <- map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]]))
+  # # Convert the list of ccf.pairs to a data.table using col_pairs
+  # dt.ccf.pairs <- rbindlist(lapply(seq_along(col_pairs), function(i) {
+  #   pair <- col_pairs[[i]]
+  #   res <- ccf.pairs[[i]]
+  #   data.table( ts1 = pair[1], ts2 = pair[2], max_lag = res$max_lag, max_ccf = res$max_ccf)
+  # }))
+
+
+  # Generate the data.table with the ccf.pairs and column pairs in one statement
+  if (mtd.paired_ccf == "S"){
+   dt.ccf.pairs <- rbindlist(map2(col_pairs,
+                                 map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]], max.lag = max.lag)),
+                                 ~ {
+                                   data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
+                                 }))
+  }else{
+
+  # Number of columns
+   n_cols <- length(names(dt.trt_wide))
+
+   # Generate all pairs of columns
+   col_pairs <- combn(names(dt.trt_wide), 2, simplify = FALSE)
+
+   # Split pairs into batches
+   pair_batches <- split(col_pairs, ceiling(seq_along(col_pairs) / batch_size))
+  # batch process
+   if (mtd.paired_ccf == "LB"){
+
+     # Process each batch separately and combine results
+     dt.ccf.pairs <- rbindlist(lapply(pair_batches, function(batch) {
+       rbindlist(map2(batch,
+                      map(batch, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]], max.lag = max.lag)),
+                      ~ {
+                        data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
+                      }))
+     }))
+
+
+   }
+
+   # parallel process for large dataset
+   if (mtd.paired_ccf == "LP"){
+
+    # Number of cores (use one less than the total number of cores)
+    num_cores <- detectCores() - 1
+
+    # Parallel processing of each batch and combining results
+    dt.ccf.pairs <- rbindlist(mclapply(pair_batches, function(batch) {
+      rbindlist(map2(batch,
+                     map(batch, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]], max.lag = max.lag)),
+                     ~ {
+                       data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
+                     }))
+    }, mc.cores = num_cores))
+
+  }
+
+ }
+
+  result_dt.sel <- dt.ccf.pairs[max_lag == 0 & !is.na(max_ccf)]
+
+  ts.sel <- data.table(ts.sel = unlist(result_dt.sel$ts1, result_dt.sel$ts2))
+  ts.sel <- ts.sel[, .N, by = .(ts.sel)]
+  id.candi <- unique(ts.sel$ts.sel)
+
+  # the result of step 1 is id.candi, it serves as the initial sample list of master chronology for step 2
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+  # step 2: find the sample list of master chronology satisfying the condition that max_ccf @lag0 for each sample in this list with the master chronology
+
+  # algorithm on pass
+
+  s2.end <- FALSE;  i.iter <- 1;
+  while(!s2.end & i.iter <= max.trial){
+
+    # mean of master chronology
+    dt.s2.avg <- dt.rw_long[SampleID.chr %in%  id.candi][, .(.N, mean.rw = mean(RawRing)), by = .(Year)]
+    setorder(dt.s2.avg, Year)
+    dt.s2.avg [, mean.rw.dif:= mean.rw - shift(mean.rw)]
+
+    dt.s2.wide <- merge(dt.s2.avg[, c("Year", "mean.rw.dif")], dt.trt_wide.o, by = "Year")
+    # ccf of all samples with the master chronology
+    dt.s2.ccf <-rbindlist(lapply(3:ncol(dt.s2.wide), ccf_avg, data = dt.s2.wide, max.lag = max.lag, qa_code = "Fail"))
+    # valid samples for master chronology
+    id.pass <- unique(dt.s2.ccf[qa_code == "Pass"]$SampleID.chr)
+    # id.dif <- setdiff(union(id.candi, id.pass) ,intersect (id.candi, id.pass))
+    s2.end <- length(setdiff(union(id.candi, id.pass) ,intersect (id.candi, id.pass))) == 0
+    print(paste0(i.iter, " N.pass: ", length(id.candi)))
+    # selection list stops changing
+    if ( s2.end != TRUE) {
+      id.candi <- id.pass
+      i.iter <- i.iter + 1
+
+    }
+  }
+  setorder(dt.s2.ccf, SampleID.chr)
+  dt.s2.avg[, c("success", "iteration") := .(s2.end, i.iter)]
+
+  # for generating plots
+  # pre series data for both rw and treated in wide format
+  dt.raw.series <- merge(dt.s2.avg[, c("Year", "mean.rw")], dt.rw_wide, by = "Year")
+  dt.trt.series <- merge(dt.s2.avg[, c("Year", "mean.rw.dif")], dt.trt_wide.o, by = "Year")
+
+  setcolorder(dt.raw.series, c("Year", "mean.rw", sample.lst))
+  setcolorder(dt.trt.series, c("Year", "mean.rw.dif", sample.lst))
+
+
+  # pre data for bar plotting on ccf with master for raw and treated series
+
+  dt.trt.ccf <- copy(dt.s2.ccf)
+  dt.ccf.idlabel <- dt.trt.ccf[ccf.ord==1, c("SampleID.chr", "qa_code", "lag")]
+  dt.ccf.idlabel[, id.label:= paste0(str_sub(SampleID.chr, 3, -1),"$", qa_code,"$", lag)]
+  dt.trt.ccf<- merge(dt.trt.ccf, dt.ccf.idlabel[, c("SampleID.chr", "id.label")],by = "SampleID.chr")
+  dt.trt.ccf <- dcast(dt.trt.ccf, lag ~ id.label, value.var = "acf.trt")
+  names(dt.trt.ccf)
+  idlabel.lst <- sort(unique(dt.ccf.idlabel$id.label))
+  # test if in the same order as others
+  idlabel.lst2 <- str_split_fixed(idlabel.lst, "\\$",3)[,1]
+  if (!all.equal(idlabel.lst2,str_split_fixed(sample.lst, "\\_",2)[,2]  )) print("check the order of id.label in dt.ccf.idlabel")
+  setcolorder(dt.trt.ccf, c("lag", idlabel.lst))
+
+  # input data structure for ccf_avg Year, mean.value, sampleIDs...
+
+  dt.raw.ccf <- rbindlist(lapply(3:ncol(dt.raw.series), ccf_avg, data = dt.raw.series))
+  dt.raw.ccf <- dcast(dt.raw.ccf, lag ~ SampleID.chr, value.var = "acf.trt")
+  names(dt.raw.ccf)
+  setcolorder(dt.raw.ccf, c("lag", sample.lst))
+
+
+
+  # ccf of all samples with the master chronology
+  plot.trt.series <- lapply(3:ncol(dt.trt.series), create_plot.series, data = dt.trt.series)
+  plot.raw.series <- lapply(3:ncol(dt.raw.series), create_plot.series, data = dt.raw.series)
+  names(plot.trt.series) <- str_split_fixed(colnames(dt.trt.series)[3:ncol(dt.trt.series)], "\\_",2)[,2]
+  names(plot.raw.series) <- str_split_fixed(colnames(dt.raw.series)[3:ncol(dt.raw.series)], "\\_",2)[,2]
+  # print(plot.trt.series[[2]])
+  # print(plot.raw.series[[2]])
+
+names(plot.trt.series)
+
+  plot.trt.ccf <- lapply(2:ncol(dt.trt.ccf), create_barplot, data = dt.trt.ccf)
+  plot.raw.ccf <- lapply(2:ncol(dt.raw.ccf), create_barplot, data = dt.raw.ccf)
+
+  names(plot.trt.ccf) <- str_split_fixed(colnames(dt.trt.ccf)[2:ncol(dt.trt.ccf)], "\\_",2)[,2]
+  names(plot.raw.ccf) <- str_split_fixed(colnames(dt.raw.ccf)[2:ncol(dt.raw.ccf)], "\\_",2)[,2]
+
+  # print(plot.trt.series[[2]])
+  # print(plot.raw.ccf[[2]])
+  # print(plot.trt.ccf[[2]])
+  # plot.lst <- list(plot.raw.series, plot.trt.series, plot.raw.ccf, plot.trt.ccf )
+  plot.lst <- list(plot.raw.series = plot.raw.series, plot.trt.series = plot.trt.series, plot.raw.ccf = plot.raw.ccf, plot.trt.ccf = plot.trt.ccf)
+  # return(list(plot.raw.series = plot.raw.series, plot.trt.series = plot.trt.series, plot.raw.ccf = plot.raw.ccf, plot.trt.ccf = plot.trt.ccf))
+
+
+
+  dt.s2.ccf[, SampleID := str_split_fixed(SampleID.chr, "\\_",2)[,2] ]
+  setcolorder(dt.s2.ccf, "SampleID")
+  dt.s2.ccf[, SampleID.chr := NULL]
+  # sample.lst.o <- str_split_fixed(sample.lst, "\\_",2)[,2]
+  return(list(dt.ccf = dt.s2.ccf, master = dt.s2.avg, plot.lst = plot.lst))
+  # the result of step 2 is dt.s2.ccf, samples with qa_code = "Pass" to form the master chronology
+
+}
+
+
+
+# Define a function to calculate max cross-correlation lag
+
+#' pair-wise ccf
+#' @description
+#' pair-wise ccf
+#' @param ts1 first series
+#' @param ts2 second series
+#' @param max.lag maximum lag for ccf
+
+
+#' @import data.table
+
+#'
+
+#' @export ccf_pairs
+ccf_pairs <- function(ts1, ts2, max.lag = 10) {
+  ccf.chk <- ccf(ts1, ts2, lag.max = max.lag, na.action = na.pass,  plot = FALSE)
+  max_ccf <- max(ccf.chk$acf)
+  max_lag <- ccf.chk$lag[which.max(ccf.chk$acf)]
+  return(list(max_lag = max_lag, max_ccf = max_ccf))
+}
+
+
+#' ccf with master/mean chronology
+#' @description
+#' ccf with master/mean chronology
+#' @param icol column index
+#' @param data data in wide format, first column is "Year", second column is master/mean chronology
+#' @param blcrit criteria for borderline
+#' @param max.lag maximum lag for ccf
+#' @param qa_code quality classification code (NULL, no code)
+
+#' @import data.table
+
+#'
+
+#' @export ccf_avg
+ccf_avg <- function(icol, data, blcrit = 0.1, max.lag = 10, qa_code="fail"){
+
+  dt.pairs <- ccf(data[,2],data[,icol, with = FALSE],lag.max=max.lag,plot=FALSE, na.action = na.pass)
+  dt.ccf <- data.table(SampleID.chr = names(data)[icol], lag = as.vector(dt.pairs$lag), acf.trt = as.vector(dt.pairs$acf))
+  setorder(dt.ccf, -acf.trt)
+  dt.ccf[, ccf.ord:= 1:.N]
+  setorder(dt.ccf, lag)
+
+  if (!is.null(qa_code)){
+    qa_code <- "Fail"
+  # max acf at lag 0
+  if (nrow(dt.ccf[lag == 0 & ccf.ord == 1]) == 1 ) qa_code="pass"
+  if (nrow(dt.ccf[lag == 0 & ccf.ord == 2]) == 1 & abs(dt.ccf[ccf.ord == 1]$acf.trt - dt.ccf[ccf.ord == 2]$acf.trt) <blcrit) qa_code="borderline"
+  if (nrow(dt.ccf[lag == 0 & ccf.ord == 1]) == 0 & dt.ccf[ccf.ord == 1]$acf.trt / dt.ccf[ccf.ord == 2]$acf.trt > 2) qa_code="highpeak"
+  if (nrow(dt.ccf[lag == 1 & ccf.ord == 1]) + nrow(dt.ccf[lag == -1 & ccf.ord == 1]) == 1) qa_code="pm1"
+  dt.ccf$qa_code <- qa_code
+  }
+  return(dt.ccf)
+}
+
+create_plot.series <- function(icol, data) {
+  if (str_detect(deparse(substitute(data)), "trt")) label <- "treated" else label <- "raw"
+  sampleID<- names(data)[icol]
+  p <- ggplot(data, aes(x = Year)) +
+    geom_line(aes(y = get(sampleID), color = 'Tree'), na.rm = TRUE) +
+    geom_point(aes(y = get(sampleID), color = 'Tree'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
+    geom_line(aes(y = get(names(data)[2]), color = 'Master'), na.rm = TRUE) +
+    geom_point(aes(y = get(names(data)[2]), color = 'Master'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
+    labs(title = paste(label," ", str_sub(sampleID, 3)),
+         x = "Year", y = paste0(label, " rw"),
+         color = "Series") +
+    theme_minimal()
+  return(p)
+}
+
+
+
+create_barplot <- function(icol, data) {
+  sampleID.chr <- names(data)[icol]
+  if (str_detect(deparse(substitute(data)), "trt")) {
+    parts <- str_split_fixed(names(data)[icol], "\\$",3)
+    test <- parts[, 2]
+    lagmax <- as.integer(parts[, 3])
+    sampleID.o <- parts[, 1]
+    label <- "treated"
+    dt.clrs <- data.table(lag = -10:10)
+    dt.clrs[, colr:= ifelse(lag == lagmax, "red", "black")]
+    dt.clrs[lag == 0 & colr == 'black', colr:= "blue"]
+    clrs <- setNames(as.character(dt.clrs$colr), as.character(dt.clrs$lag))
+  } else {
+
+    label <- "raw"
+    test <- ""
+    sampleID.o <- str_split_fixed(sampleID.chr, "\\_",2)[,2]
+    dt.clrs <- data.table(lag = -10:10)
+    dt.clrs[, colr:=  "black"]
+    dt.clrs[lag == 0 , colr:= "blue"]
+    clrs <- setNames(as.character(dt.clrs$colr), as.character(dt.clrs$lag))
+  }
+
+
+  # Create the bar plot
+  p <- ggplot(data, aes(x = as.factor(lag), y = get(sampleID.chr), fill = as.factor(lag))) +
+    geom_bar(stat = "identity",na.rm = TRUE) +
+    scale_fill_manual(values = clrs) +
+    # scale_fill_manual(values = clrs) +
+    labs(title = paste("ccf_", label, " ", sampleID.o, " ", test),
+         x = "lag", y = paste0("correlation with ", label, " master"),
+         color = "Series") +
+    ylim(-1, 1) +
+    theme_minimal() +
+    theme(legend.position = "none")
+  return(p)
+}
+
+
+

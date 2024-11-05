@@ -1,30 +1,14 @@
-# author: Xiao Jing Guo (xiaojing.guo@nrcan-rncan.gc.ca)
 # purpose: compare gamm models using ML method
-# input: clim.test: the climate variable to test
-# m.form.base: all the predictors except the one being tested
-# t00: no species effect on both intercept and clim.test
-# t0: no species effect on clim.test
-# t1: species effect on both intercept and clim.test
-# m.canidates: the list of models to be compared.
-
-# output:
-  # 1 the winning model with smallest AIC
-  # 2 the fitting statistics of all involved model in m.candidates
-
-# note: the code can be used for prediction by changing mtd to "REML" and choosing the right m.candidates
 
 
 #' species-site level of detrending BAI using gamm
 #' @description
 #' detrending BAI using gamm model with family = Gamma(link='log') and corAR1."REML" and "ML" methods are available.It can be used to compare models with aic using "ML" method.
 #'
-#' @param data : datatable
-#' @param resp_scale log or original scale of bai
-#' @param mtd : method ML or REML
-#' @param m.candidates : the list of RHS of formulas
-#' @param out.mod : output gamm object (TRUE or FALSE)
-#' @param out.csv : output csv files (TRUE or FALSE)
-#' @param out.dir : directory of output csv files
+#' @param data data containing all necessary columns to run the model
+#' @param resp_scale the scale of response variable. default is "log" for log-scale, otherwise modeling the response variable as it is
+#' @param m.candidates the list of formulas.
+#' @param out.csv directory of output csv files. default is NULL for no csv output.
 #'
 #'
 #'
@@ -36,10 +20,17 @@
 #'
 #'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
+#' @details
+#' If users specify multiple candidate models as input to m.candiates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
+#' The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
+#' it will be refitted using the restricted maximum likelihood (REML) method to obtain unbiased estimates of model parameters.
+#'
+#' If users specify only 1 candidate model as input to m.candiates argument, the model will apply REML model directly.
+
 #' @export detrend_site
 #'
 
-detrend_site <- function(data, resp_scale = "log", mtd, m.candidates, out.mod = FALSE, out.csv = FALSE, out.dir = NULL){
+detrend_site <- function(data, resp_scale = "log", m.candidates,  out.csv = NULL){
   if (resp_scale == "log") {
 
     famil = gaussian("identity")
@@ -47,17 +38,17 @@ detrend_site <- function(data, resp_scale = "log", mtd, m.candidates, out.mod = 
     famil = Gamma("log")
   }
   # for comparing and selecting model on AIC
-  if (mtd == "ML" & length(m.candidates) > 1){
+  if (length(m.candidates) > 1){
 for (i in 1:length(m.candidates)){
   formul <- as.formula(m.candidates[i])
   if (resp_scale == "log") formul <- update(formul, log(.) ~ .)
 
   m.tmp <- gamm(formul,
                    random = list(uid_tree.fac=~1), correlation = corCAR1(value = 0.5),
-                   method = mtd,family = famil, data = data)
+                   method = "ML",family = famil, data = data)
 
 
-  aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp$lme), R2 = summary(m.tmp$gam)$r.sq, methd = mtd)
+  aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp$lme), R2 = summary(m.tmp$gam)$r.sq, methd = "ML")
 
 
   if (i == 1) {
@@ -82,22 +73,23 @@ form.sel <- aic.all[aic == min(aic)]$form
 # saveRDS(m.sel, compress = TRUE, file =   paste0(clim.test,"/", "sel.mod", " ",mtd,".rds"))
 rm(m.sel)
 # saveRDS(aic.all, compress = TRUE, file =   paste0(clim.test,"/","fitting ", mtd ,".rds"))
-if (out.csv == TRUE){
-  if (is.null(out.dir)) message("please provide the directiory to output csv files")  else{
-    if (!(dir.exists(out.dir))) dir.create(out.dir, recursive = TRUE)
-write.csv(aic.all, file =  file.path(out.dir, paste0("fitting ", mtd ,".csv")), row.names = FALSE, na = "")
-  }
-}
+if (!is.null(out.csv)){
+
+  if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
+write.csv(aic.all, file =  file.path(out.csv, paste0("fitting ML.csv")), row.names = FALSE, na = "")
   }
 
-  if (mtd == "ML" & length(m.candidates) == 1) {
-    print(paste0("only 1 equation, NO USE for ML method, please check"))
-    return()
-    }
-  if(mtd == "REML" & length(m.candidates) >1) {
-    print(paste0("multiple equations for REML method, please check"))
-    return()}
-if(mtd == "REML" & length(m.candidates) == 1) {
+
+  }
+
+  # if (mtd == "ML" & length(m.candidates) == 1) {
+  #   print(paste0("only 1 equation, NO USE for ML method, please check"))
+  #   return()
+  #   }
+  # if(mtd == "REML" & length(m.candidates) >1) {
+  #   print(paste0("multiple equations for REML method, please check"))
+  #   return()}
+if(length(m.candidates) == 1) {
   # for 1 equation only
   form.sel <- as.formula(m.candidates)
   if (resp_scale == "log") form.sel <- update(form.sel, log(.) ~ .)
@@ -107,7 +99,6 @@ if(mtd == "REML" & length(m.candidates) == 1) {
                 random = list(uid_tree.fac=~1), correlation = corCAR1(value = 0.5),
                 method = "REML",family = famil, data = data)
 
-  if (out.mod) saveRDS(m.sel, compress = TRUE, file =   file.path(out.dir, paste0("sel.mod_REML",".rds")))
 
  pred.terms  <-as.data.frame( predict(m.sel$gam, type="terms",se.fit=TRUE))
   setnames(pred.terms, c("fit.s.ageC.", "se.fit.s.ageC."),c("fit.s.ageC", "se.fit.s.ageC"))
@@ -154,16 +145,16 @@ if(mtd == "REML" & length(m.candidates) == 1) {
   stable <- data.table(Parameter = row.names(summary(m.sel$gam)$s.table), summary(m.sel$gam)$s.table)
   aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel$lme), R2 = summary(m.sel$gam)$r.sq, methd = "REML")
 
-  if (out.csv == TRUE){
-  if (is.null(out.dir)) message("please provide the directiory to output csv files")  else{
-    if (!(dir.exists(out.dir))) dir.create(out.dir, recursive = TRUE)
-  write.csv(ptable, file =  file.path(out.dir, paste0("ptable ", "REML" ,".csv")), row.names = FALSE, na = "")
-  write.csv(stable, file =  file.path(out.dir, paste0("stable ", "REML" ,".csv")), row.names = FALSE, na = "")
-  write.csv(tmp.bai, file = file.path(out.dir, paste0("prediction ", "REML" ,".csv")), row.names = FALSE, na = "")
-  write.csv(aic.reml, file = file.path(out.dir, paste0("fitting ", "REML" ,".csv")), row.names = FALSE, na = "")
+  if (!is.null(out.csv)){
+
+    if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
+  write.csv(ptable, file =  file.path(out.csv, paste0("ptable ", "REML" ,".csv")), row.names = FALSE, na = "")
+  write.csv(stable, file =  file.path(out.csv, paste0("stable ", "REML" ,".csv")), row.names = FALSE, na = "")
+  write.csv(tmp.bai, file = file.path(out.csv, paste0("prediction ", "REML" ,".csv")), row.names = FALSE, na = "")
+  write.csv(aic.reml, file = file.path(out.csv, paste0("fitting ", "REML" ,".csv")), row.names = FALSE, na = "")
   }
 
-    }
+
 # if (make.plot) {
 #   p.bai <- ggplot(tmp.bai, aes(x = year, y = fit.bai, color = species.fac)) + geom_line(size =1.2) +
 #     geom_ribbon(aes(ymin=exp(lci_bai), ymax=exp(uci_bai), fill = species.fac), alpha=0.2) +
@@ -182,7 +173,7 @@ if(mtd == "REML" & length(m.candidates) == 1) {
 # }
 
 # return(i.sel)
-return(list(model = m.sel, fitting = aic.reml, ptable = ptable, stable = stable, predtable = tmp.bai))
+return(list(model = m.sel, fitting = aic.reml, ptable = ptable, stable = stable, pred = tmp.bai))
 }
 
 # chron <- function(data){

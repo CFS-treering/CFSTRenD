@@ -1,14 +1,12 @@
 # functions
 
-#' plotting ccf
+#' plotting quality assessment
 #' @description
 #' plotting ccf results for each tree
 #'
-#' @param plot.lst : plot list from generate_plots
-#' @param out_series : 3 options(A: all series; P: specific series of out_N; R: randomly selected samples)
-#' @param out_N : for out_series A, not necessary; for P: list of index of specific series; R: number of series to be randomly selected
-#' @param outpdf_YN :  option to output the results in pdf ("Y", "N")
-#' @param outpdf_fn : output file name including path/filename.pdf
+#' @param plot.lst plot list from generate_plots
+#' @param out.series SampleID list to be plotted, default -999 for output all samples
+#' @param out.pdf output file name including path/filename.pdf, default NULL for device screen
 
 
 
@@ -16,35 +14,29 @@
 #' @import gridExtra
 #' @importFrom grDevices dev.off pdf
 
-#' @export plot_results
+#' @export plots_qa
 
-plot_results <- function(plot.lst, out_series = "A", out_N = NULL, outpdf_YN ,outpdf_fn ) {
+plots_qa <- function(plot.lst, out.series = "all", out.pdf= NULL ) {
 
-  if (!(toupper(out_series) %in% c("A", "P", "R"))) stop("out_series has 3 options: 'A', 'P' or 'R'" )
-  if (!(toupper(outpdf_YN) %in% c("Y", "N"))) stop("outpdf_YN has 3 options: 'Y' or 'N'" )
 
-  idx.all <- seq_along(plot.lst$plot.raw.series)
 
-  if ((out_series) == "A") idx.lst <- idx.all
+  samples.all <- names(plot.lst$plot.raw.series)
 
-  if ((out_series) == "R"){
-    if (is.null(out_N)) stop("out_N cannot be null to output random-selected") else
-      idx.lst <- sample(idx.all, out_N)
+  if (all(tolower(out.series) == "all")) idx.lst <- seq_along(samples.all) else {
+    idx.lst <- sapply(out.series, function(item) match(item, samples.all))
+    idx.lst <- idx.lst[!is.na(idx.lst)]
 
   }
-  if ((out_series) == "P"){
-    if (is.null(out_N)) stop("out_N cannot be null to output random-selected") else
-      idx.lst <- out_N
-  }
 
 
+  if (all(is.na(idx.lst))) stop("cannot find out.series, please verify if they exist in sample.lst")
   # plot.lst <- generate.plots(master.trt, dt.input)
 
-  if (toupper(outpdf_YN) == "Y")  {
-    if (is.null(outpdf_fn)) stop("please input the path/filename as outpdf_fn" )
+
+    if (!is.null(out.pdf))
     # Open a PDF device
-    pdf(outpdf_fn, onefile = TRUE)
-  }
+    pdf(out.pdf, onefile = TRUE)
+
 
     # Loop through the plot lists and arrange them on each page
     for (i in idx.lst) {
@@ -53,125 +45,93 @@ plot_results <- function(plot.lst, out_series = "A", out_N = NULL, outpdf_YN ,ou
     }
 
   # Close the PDF device
-  if (toupper(outpdf_YN) == "Y") dev.off()
+  if (!is.null(out.pdf)) dev.off()
 }
 
-# pre data for plotting series vs year
-# pre.plot <- function(masterchron, dt.rw.wide, dt.trt.wide, sample.lst){
 
-#' generating plots for all series
+
+
+
+
+
+#' plot frequency distribution by geo-location per species
 #' @description
-#' generating plots for all series
-#' @param master.trt : master chronology from tr.fullmaster function
-#' @param dt.input : tables from pre.dataFormat function
+#' This function plots the frequency distribution by geo-location per species
+#'
+#' @param dt.freq a table resulting from function CFS_freq()
+#' @param out.species species list, default is 'all' to output all species
+#' @param out.pdf output file name including path/filename.pdf, default is NULL for screen display
+
 
 
 #' @import data.table
-#' @import ggplot2
+#' @importFrom grDevices dev.off pdf
 
-#' @export generate_plots
+#' @export plots_freq
 
-generate_plots <- function(master.trt, dt.input){
+plots_freq <- function(dt.freq, out.species = "all", out.pdf= NULL ) {
+  uid_label <- str_split(unique(dt.freq$uid_label), "_yr",2)[[1]]
+  print(uid_label)
+  dist.uids <- melt(dt.freq, id.vars = c("uid_label", "species" , "ord", "N", "pct.species" , "lat"),
+                  variable.name = "lon",
+                  value.name = "nuids")[!is.na(nuids)]
+  dist.uids[, lon:= as.numeric(as.character(lon))]
+  setorder(dist.uids, ord, lon, lat)
+  if (all(tolower(out.species) == "all")) data.tmp <- dist.uids
+  else{
 
-  # pre series data for both rw and treated in wide format
-  dt.raw.series <- merge(master.trt$master[, c("Year", "mean.rw")], dt.input$dt.rw_wide, by = "Year")
-  dt.trt.series <- merge(master.trt$master[, c("Year", "mean.rw.dif")], dt.input$dt.trt_wide, by = "Year")
-
-  setcolorder(dt.raw.series, c("Year", "mean.rw", dt.input$sample.lst))
-  setcolorder(dt.trt.series, c("Year", "mean.rw.dif", dt.input$sample.lst))
-
-
-  # pre data for bar plotting on ccf with master for raw and treated series
-
-  dt.trt.ccf <- master.trt$dt.ccf
-  dt.ccf.idlabel <- dt.trt.ccf[ccf.ord==1, c("SampleID.chr", "qa_code", "lag")]
-  dt.ccf.idlabel[, id.label:= paste0(SampleID.chr,"$", qa_code,"$", lag)]
-  dt.trt.ccf<- merge(dt.trt.ccf, dt.ccf.idlabel[, c("SampleID.chr", "id.label")],by = "SampleID.chr")
-  dt.trt.ccf <- dcast(dt.trt.ccf, lag ~ id.label, value.var = "acf.trt")
-  names(dt.trt.ccf)
-  idlabel.lst <- sort(unique(dt.ccf.idlabel$id.label))
-  # test if in the same order as others
-  idlabel.lst2 <- str_split_fixed(idlabel.lst, "\\$",3)[,1]
-  if (!all.equal(idlabel.lst2, dt.input$sample.lst)) print("check the order of id.label in dt.ccf.idlabel")
-  setcolorder(dt.trt.ccf, c("lag", idlabel.lst))
-
-  # input data structure for ccf_avg Year, mean.value, sampleIDs...
-
-  dt.raw.ccf <- rbindlist(lapply(3:ncol(dt.raw.series), ccf_avg, data = dt.raw.series))
-  dt.raw.ccf <- dcast(dt.raw.ccf, lag ~ SampleID.chr, value.var = "acf.trt")
-  names(dt.raw.ccf)
-  setcolorder(dt.raw.ccf, c("lag", dt.input$sample.lst))
-
-
-
-  # ccf of all samples with the master chronology
-  plot.trt.series <- lapply(3:ncol(dt.trt.series), create_plot.series, data = dt.trt.series)
-  plot.raw.series <- lapply(3:ncol(dt.raw.series), create_plot.series, data = dt.raw.series)
-
-  # print(plot.trt.series[[2]])
-  # print(plot.raw.series[[2]])
-
-
-
-  plot.trt.ccf <- lapply(2:ncol(dt.trt.ccf), create_barplot, data = dt.trt.ccf)
-  plot.raw.ccf <- lapply(2:ncol(dt.raw.ccf), create_barplot, data = dt.raw.ccf)
-
-  # print(plot.raw.ccf[[2]])
-  # print(plot.trt.ccf[[2]])
-  return(list(plot.raw.series = plot.raw.series, plot.trt.series = plot.trt.series, plot.raw.ccf = plot.raw.ccf, plot.trt.ccf = plot.trt.ccf))
-}
-
-create_plot.series <- function(icol, data) {
-  if (str_detect(deparse(substitute(data)), "trt")) label <- "treated" else label <- "raw"
-  sampleID<- names(data)[icol]
-  p <- ggplot(data, aes(x = Year)) +
-    geom_line(aes(y = get(sampleID), color = 'Tree'), na.rm = TRUE) +
-    geom_point(aes(y = get(sampleID), color = 'Tree'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
-    geom_line(aes(y = get(names(data)[2]), color = 'Master'), na.rm = TRUE) +
-    geom_point(aes(y = get(names(data)[2]), color = 'Master'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
-    labs(title = paste(label," ", str_sub(sampleID, 3)),
-         x = "Year", y = paste0(label, " rw"),
-         color = "Series") +
-    theme_minimal()
-  return(p)
-}
-
-
-
-create_barplot <- function(icol, data) {
-  sampleID <- names(data)[icol]
-  if (str_detect(deparse(substitute(data)), "trt")) {
-    parts <- str_split_fixed(names(data)[icol], "\\$",3)
-    test <- parts[, 2]
-    lagmax <- as.integer(parts[, 3])
-    sampleID.o <- parts[, 1]
-    label <- "treated"
-    dt.clrs <- data.table(lag = -10:10)
-    dt.clrs[, colr:= ifelse(lag == lagmax, "red", "black")]
-    dt.clrs[lag == 0 & colr == 'black', colr:= "blue"]
-    clrs <- setNames(as.character(dt.clrs$colr), as.character(dt.clrs$lag))
-  } else {
-
-    label <- "raw"
-    test <- ""
-    sampleID.o <- sampleID
-    dt.clrs <- data.table(lag = -10:10)
-    dt.clrs[, colr:=  "black"]
-    dt.clrs[lag == 0 , colr:= "blue"]
-    clrs <- setNames(as.character(dt.clrs$colr), as.character(dt.clrs$lag))
+    data.tmp <- dist.uids[species %in% out.species]
   }
 
 
-  # Create the bar plot
-  p <- ggplot(data, aes(x = as.factor(lag), y = get(sampleID), fill = as.factor(lag))) +
-    geom_bar(stat = "identity",na.rm = TRUE) +
-    scale_fill_manual(values = clrs) +
-    # scale_fill_manual(values = clrs) +
-    labs(title = paste("ccf_", label, " ", str_sub(sampleID.o, 3), " ", test),
-         x = "lag", y = paste0("correlation with ", label, " master"),
-         color = "Series") +
-    ylim(-1, 1) +
-    theme_minimal() +
-    theme(legend.position = "none")
-  return(p)
+
+
+
+  if (nrow(data.tmp) == 0) stop("cannot find out.series, please verify if they exist in sample.lst")
+  # plot.lst <- generate.plots(master.trt, dt.input)
+
+
+
+  data.tmp[, spc.pct := paste0(species, " N:", N, ", ", pct.species, "% (", ord, ")")]
+  data.tmp$spc.pct <- factor(data.tmp$spc.pct, levels = unique(data.tmp$spc.pct[order(data.tmp$ord)]))
+  # Get the unique spc.pct values
+  spc_pcts <- unique(data.tmp$spc.pct)
+
+  # Split into chunks of 4
+  chunks <- split(spc_pcts, ceiling(seq_along(spc_pcts) / 2))
+
+
+  if (!is.null(out.pdf))
+    # Open a PDF device
+    pdf(out.pdf, onefile = TRUE)
+
+  for (i in seq_along(chunks)) {
+    # Subset data for the current chunk
+    data.i <- data.tmp[data.tmp$spc.pct %in% chunks[[i]], ]
+
+    p1 <- ggplot(data.i, aes(x = lon, y = lat, size = nuids)) + facet_wrap(~spc.pct, ncol = 1, nrow = 2) +
+      geom_point(alpha = 0.6, color = "darkblue") +
+      scale_size_continuous(range = c(1, 10)) + # Adjust size range as needed
+      scale_x_continuous(breaks = sort(unique(data.tmp$lon))) + # Set x-axis ticks to unique values of 'lat'
+
+      theme_minimal() +
+      theme(strip.text = element_text(size = 16),# Increase the size of facet labels
+            panel.grid.minor = element_blank() , # Remove minor grid lines
+            plot.title = element_text(size = 25), # Set title size
+            plot.margin = margin(t = 10, r = 10, b = 30, l = 30, unit = "pt"), # Adjust plot margins
+            plot.caption = element_text(hjust = 0, face = "italic")) + # Customize caption appearance
+
+      labs(title = paste0( str_sub(uid_label[1], 5), " distribution by year ",uid_label[2]),
+           x = "Longitude",
+           y = "Latitude",
+           caption = "Data source: CFS-TRenD V1.2 (mar-2024)" , # Add the data source caption
+           size = paste0("n.", str_sub(uid_label[1], 5), "s"))
+
+    print(p1)
+
+  }
+
+  # Close the PDF device
+  if (!is.null(out.pdf)) dev.off()
 }
+

@@ -4,16 +4,16 @@
 \alias{CFS_scale}
 \title{plot the median of tree ring measurement of 1 site and of its nearest neighbors}
 \usage{
-CFS_scale(site2chk, tr_all_wide, ver.tr = "V1.2", N.nb)
+CFS_scale(site2chk, tr_all_wide, N.nb, make.plot = FALSE)
 }
 \arguments{
-\item{site2chk}{: data.table with columns uid_project, uid_site, site_id, species, longitude and latitude}
+\item{site2chk}{data.table with columns uid_project, uid_site, site_id, species, longitude and latitude}
 
-\item{tr_all_wide}{: reference sites including including rw measurement in wide format}
+\item{tr_all_wide}{reference sites including including rw measurement in wide format}
 
-\item{ver.tr}{: release version of CFS-TRenD}
+\item{N.nb}{number of nearest-neighbors}
 
-\item{N.nb}{: number of nearest-neighbors}
+\item{make.plot}{plot figures (default: FALSE)}
 }
 \description{
 plot the median of tree ring measurement of 1 site and of its nearest neighbors

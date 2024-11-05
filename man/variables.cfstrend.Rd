@@ -7,7 +7,7 @@
 variables.cfstrend()
 }
 \value{
-two lists: meta.all and ord.all
+a data table of variable descriptions of all tables
 }
 \description{
 prepare variable names and column order for each tables

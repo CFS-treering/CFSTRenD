@@ -36,8 +36,8 @@
 # i <- 197;  rwl<- fn.lst[i]
 #' read rwl files which were downloaded locally from ITRDB
 #'
-#' @param dir.src : directory of source rwl files
-#' @param rwl : file name
+#' @param dir.src directory of source rwl files
+#' @param rwl file name
 #' @import data.table
 #' @import stringr
 #'
@@ -307,7 +307,7 @@ read_rwl <-function (dir.src, rwl) {
 # print(paste0(rwl, " ", comments.rw))
 # if (nchar(comments.rw) < 7) comments.rw <- ""
 dt.header$comments.rw <- comments.rw
-  return(list(dt.header = dt.header, dt.rwl.long = dt.rwl.long))
+  return(list(dt.header = dt.header, dt.rw_long = dt.rwl.long))
 }
 
 

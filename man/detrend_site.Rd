@@ -4,34 +4,27 @@
 \alias{detrend_site}
 \title{species-site level of detrending BAI using gamm}
 \usage{
-detrend_site(
-  data,
-  resp_scale = "log",
-  mtd,
-  m.candidates,
-  out.mod = FALSE,
-  out.csv = FALSE,
-  out.dir = NULL
-)
+detrend_site(data, resp_scale = "log", m.candidates, out.csv = NULL)
 }
 \arguments{
-\item{data}{: datatable}
+\item{data}{data containing all necessary columns to run the model}
 
-\item{resp_scale}{log or original scale of bai}
+\item{resp_scale}{the scale of response variable. default is "log" for log-scale, otherwise modeling the response variable as it is}
 
-\item{mtd}{: method ML or REML}
+\item{m.candidates}{the list of formulas.}
 
-\item{m.candidates}{: the list of RHS of formulas}
-
-\item{out.mod}{: output gamm object (TRUE or FALSE)}
-
-\item{out.csv}{: output csv files (TRUE or FALSE)}
-
-\item{out.dir}{: directory of output csv files}
+\item{out.csv}{directory of output csv files. default is NULL for no csv output.}
 }
 \value{
 list including model, fitting statistics, ptable, stable and prediction table
 }
 \description{
 detrending BAI using gamm model with family = Gamma(link='log') and corAR1."REML" and "ML" methods are available.It can be used to compare models with aic using "ML" method.
+}
+\details{
+If users specify multiple candidate models as input to m.candiates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
+The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
+it will be refitted using the restricted maximum likelihood (REML) method to obtain unbiased estimates of model parameters.
+
+If users specify only 1 candidate model as input to m.candiates argument, the model will apply REML model directly.
 }

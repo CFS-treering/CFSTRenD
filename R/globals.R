@@ -1,3 +1,4 @@
+# to avoid warnings in checking for data.table variables
 utils::globalVariables(c( ":=", ".", "!!"))
 utils::globalVariables(c( "Format", "FormatV"))
 

@@ -7,9 +7,9 @@
 read_rwl(dir.src, rwl)
 }
 \arguments{
-\item{dir.src}{: directory of source rwl files}
+\item{dir.src}{directory of source rwl files}
 
-\item{rwl}{: file name}
+\item{rwl}{file name}
 }
 \value{
 two tables: header and rwl measurement
