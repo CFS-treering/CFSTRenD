@@ -1,9 +1,8 @@
-# purpose: compare gamm models using ML method
 
-
-#' species-site level of detrending BAI using gamm
+#' tree growth model with gamm and model selection
 #' @description
-#' detrending BAI using gamm model with family = Gamma(link='log') and corAR1."REML" and "ML" methods are available.It can be used to compare models with aic using "ML" method.
+#' A wrapper function for the Generalized Additive Mixed Model (GAMM) to model annual tree growth, such as basal area increment.
+#' It allows for modeling the log-transformed scale of tree growth.
 #'
 #' @param data data containing all necessary columns to run the model
 #' @param resp_scale the scale of response variable. default is "log" for log-scale, otherwise modeling the response variable as it is
@@ -21,16 +20,22 @@
 #'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
 #' @details
-#' If users specify multiple candidate models as input to m.candiates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
-#' The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
-#' it will be refitted using the restricted maximum likelihood (REML) method to obtain unbiased estimates of model parameters.
+#' The function implements tree identity as a random effect and incorporates a first-order autoregressive (AR1) correlation structure in the model.
+#' To address the skewness of basal area increment (BAI), a Gamma family distribution with a log link function is employed.
+#' When applied on the log scale of BAI, a normal distribution with an identity link function is employed,
+#' assuming that the log-transformed BAI follows a normal distribution.
 #'
-#' If users specify only 1 candidate model as input to m.candiates argument, the model will apply REML model directly.
+#' If users specify multiple candidate models through the m.candiates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
+#' The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
+#' it will be refitted using the restricted maximum likelihood (REML) method.
+#'
+#' If users specify only 1 candidate model through the m.candiates argument, the model is fitted with "REML" method.
 
 #' @export detrend_site
 #'
 
 detrend_site <- function(data, resp_scale = "log", m.candidates,  out.csv = NULL){
+  if (length(m.candidates) == 0) stop("must assign the equation(s) to m.candidates")
   if (resp_scale == "log") {
 
     famil = gaussian("identity")
@@ -69,7 +74,7 @@ for (i in 1:length(m.candidates)){
 }
 # aic.all$clim.test <- clim.test
 aic.all[aic == min(aic), selected := "*"]
-form.sel <- aic.all[aic == min(aic)]$form
+form.sel <- as.formula(aic.all[aic == min(aic)]$form)
 # saveRDS(m.sel, compress = TRUE, file =   paste0(clim.test,"/", "sel.mod", " ",mtd,".rds"))
 rm(m.sel)
 # saveRDS(aic.all, compress = TRUE, file =   paste0(clim.test,"/","fitting ", mtd ,".rds"))
@@ -80,16 +85,7 @@ write.csv(aic.all, file =  file.path(out.csv, paste0("fitting ML.csv")), row.nam
   }
 
 
-  }
-
-  # if (mtd == "ML" & length(m.candidates) == 1) {
-  #   print(paste0("only 1 equation, NO USE for ML method, please check"))
-  #   return()
-  #   }
-  # if(mtd == "REML" & length(m.candidates) >1) {
-  #   print(paste0("multiple equations for REML method, please check"))
-  #   return()}
-if(length(m.candidates) == 1) {
+  }else{
   # for 1 equation only
   form.sel <- as.formula(m.candidates)
   if (resp_scale == "log") form.sel <- update(form.sel, log(.) ~ .)

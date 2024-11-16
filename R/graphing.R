@@ -1,5 +1,3 @@
-# functions
-
 #' plotting quality assessment
 #' @description
 #' plotting ccf results for each tree
@@ -60,6 +58,7 @@ plots_qa <- function(plot.lst, out.series = "all", out.pdf= NULL ) {
 #'
 #' @param dt.freq a table resulting from function CFS_freq()
 #' @param out.species species list, default is 'all' to output all species
+#' @param caption caption of data source
 #' @param out.pdf output file name including path/filename.pdf, default is NULL for screen display
 
 
@@ -69,9 +68,11 @@ plots_qa <- function(plot.lst, out.series = "all", out.pdf= NULL ) {
 
 #' @export plots_freq
 
-plots_freq <- function(dt.freq, out.species = "all", out.pdf= NULL ) {
+plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL ) {
   uid_label <- str_split(unique(dt.freq$uid_label), "_yr",2)[[1]]
-  print(uid_label)
+  if (!is.na(uid_label[2])) title.tmp <- paste0( str_sub(uid_label[1], 5), " distribution by year ",uid_label[2]) else
+    title.tmp <- paste0( str_sub(uid_label[1], 5), " distribution")
+  # print(uid_label)
   dist.uids <- melt(dt.freq, id.vars = c("uid_label", "species" , "ord", "N", "pct.species" , "lat"),
                   variable.name = "lon",
                   value.name = "nuids")[!is.na(nuids)]
@@ -121,10 +122,10 @@ plots_freq <- function(dt.freq, out.species = "all", out.pdf= NULL ) {
             plot.margin = margin(t = 10, r = 10, b = 30, l = 30, unit = "pt"), # Adjust plot margins
             plot.caption = element_text(hjust = 0, face = "italic")) + # Customize caption appearance
 
-      labs(title = paste0( str_sub(uid_label[1], 5), " distribution by year ",uid_label[2]),
+      labs(title = title.tmp,
            x = "Longitude",
            y = "Latitude",
-           caption = "Data source: CFS-TRenD V1.2 (mar-2024)" , # Add the data source caption
+           caption = paste0("Data source: ", caption) , # Add the data source caption
            size = paste0("n.", str_sub(uid_label[1], 5), "s"))
 
     print(p1)

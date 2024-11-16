@@ -12,57 +12,55 @@
 #   qa_code(Pass, borderline, highpeak, pm1) for each sample
 
 
-#' tree ring data quality classification and master chronology
+#' tree-ring data measurement assessment
 #' @description
-#' classify tree ring data in five classes ("pass","borderline", "pm1", "highpeak", "fail") using the difference series.
+#' Assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
 #'
 #' @param dt.input tree ring data with at least 3 columns (SampleID, Year, RawRing)
-#' @param mtd.paired_ccf processing approach for paired ccf c("S", "LB", "LP")
-#' @param batch_size  batch size for processing large dataset
-#' @param max.lag maximum lag for ccf
-#' @param max.trial maximum loop for step 2 to form the master dendrochronology
+#' @param batch_size  number of pairs to run in a batch, to avoid memory issues in processing large dataset
+#' @param max.lag maximum lag up to which the correlation should be calculated in CCF
+#' @param max.iter maximum number of iterations of step 2(see Details)
 
 #'
 #'
 #'
-#' @rawNamespace import(purrr, except = c(transpose))
+
 #' @import data.table
+
+#' @import future
+#' @import furrr
 #' @import parallel
+#' @importFrom purrr map map2
 #'
-#' @return
-#' dt.ccf:	A data table containing the CCF results for all samples, including the quality assessment code (qa_code).
-#'
-#' master:	The final master chronology, including both raw master chronology, the mean of ring measurement of the series with pass, and the treated  master chronology, calculated as the difference of two consecutive raw master chronology.
+#' @return A list of 3 elements:
+#' 1) dt.ccf:	A data table containing the CCF results for all samples, including the quality assessment code (qa_code).
+#' 2) master:	The final master chronology, including both raw master chronology, the mean of ring measurement of the series with pass,
+#' and the treated  master chronology, calculated as the difference of two consecutive raw master chronology.
+#' 3) plot.lst:	plots of the raw and treated ring measurements with year, along with the CCF plots for each sample.
+
 
 #'
-#' plot.lst:	plots of the raw and treated ring measurements with year, along with the CCF plots for each sample.
-
-
-#'
-#' @details We present a simple algorithm to assess measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
-#  the term CCF for cross-correlation function with a window of 10 lags; and the term “meet the criteria” for the maximum correlation occurs at lag 0 of CCF.
+#' @details Assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
 #' The algorithm consists of two main steps:
 #'
-#'  Step 1. Initial treated master chronology
-#'
-#'  Perform pairwise CCF on the treated series of all possible combinations of the samples.
-#'  The pair which meets the criteria is qualified for the master chronology calculation.
-#'  We then calculate the raw ring master chronology by averaging the ring measurements of these selected samples.
+#'  Step 1. Perform pairwise CCF on the treated series of all possible combinations of the samples.
+#' raw ring master chronology is calculated as the average of the ring measurements of samples that achieve the maximum correlation at lag 0 with at least one other sample in the cross-correlation function (CCF).
 #'  The difference series of the raw ring master chronology is used as the initial treated master chronology for next step.
 #'
-#'  Step 2. Refinement on Master Chronology
-#'
-#'  Perform CCF between the treated series of each sample and the initial treated master chronology.
+#'  Step 2. Perform CCF between the treated series of each sample and the initial treated master chronology.
 #'  Samples that do not meet the criteria will be removed from the recalculation of the treated master chronology.
-#'
 #'  This step is repeated until all remaining samples in the master chronology meet the criteria.
 #'
 #' This process results in five categories classification for all samples (pass, borderline, pm1, highpeak, fail)
+#'
+#'
+#' To enhance efficiency and mitigate potential memory issues,
+#' The function supports both parallel (multi-session) and sequential modes, and also offers a batch processing option for users.
 
 #' @export CFS_qa
 #'
 
-CFS_qa <- function(dt.input , mtd.paired_ccf = "S", batch_size = 5000, max.lag = 10, max.trial = 100){
+CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
 
   if (length(setdiff(c("SampleID", "Year","RawRing" ), names(dt.input))) > 0) stop("at least one of the mandatory columns (SampleID, Year, RawRing) doesn't exist, please check...")
 
@@ -88,79 +86,35 @@ CFS_qa <- function(dt.input , mtd.paired_ccf = "S", batch_size = 5000, max.lag =
 
 
   dt.trt_wide.o <- copy(dt.trt_wide); dt.trt_wide$Year <- NULL;
-  if (!(mtd.paired_ccf %in% c("S", "LB", "LP"))) stop("please specify mtd.paired_ccf as one of c('S', 'LB', 'LP')")
   # dt.trt_wide: treated series in wide format for pair-wise ccf
   # dt.rw_long: ring width series in long format for calculating mean of master chronology
 
   # step 1: pair-wise ccf to find all the samples which can find at least 1 sample to reach max_ccf @ lag0
 
+
   # Generate all pairs of columns
   col_pairs <- combn(names(dt.trt_wide), 2, simplify = FALSE)
 
-  # Use map to calculate pairwise cross-correlation for each pair
-  # this is the most efficient way for this calculation so far i found, 20-06-24, 2 mins for 490 series
-  # system.time(ccf.pairs <- map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]])))
+  # Detect available cores for parallel processing
+  available_cores <- detectCores(logical = FALSE) - 1  # Adjusted cores based on system
 
-
-  # ccf.pairs <- map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]]))
-  # # Convert the list of ccf.pairs to a data.table using col_pairs
-  # dt.ccf.pairs <- rbindlist(lapply(seq_along(col_pairs), function(i) {
-  #   pair <- col_pairs[[i]]
-  #   res <- ccf.pairs[[i]]
-  #   data.table( ts1 = pair[1], ts2 = pair[2], max_lag = res$max_lag, max_ccf = res$max_ccf)
-  # }))
-
-
-  # Generate the data.table with the ccf.pairs and column pairs in one statement
-  if (mtd.paired_ccf == "S"){
-   dt.ccf.pairs <- rbindlist(map2(col_pairs,
-                                 map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]], max.lag = max.lag)),
-                                 ~ {
-                                   data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
-                                 }))
-  }else{
-
-  # Number of columns
-   n_cols <- length(names(dt.trt_wide))
-
-   # Generate all pairs of columns
-   col_pairs <- combn(names(dt.trt_wide), 2, simplify = FALSE)
-
-   # Split pairs into batches
-   pair_batches <- split(col_pairs, ceiling(seq_along(col_pairs) / batch_size))
-  # batch process
-   if (mtd.paired_ccf == "LB"){
-
-     # Process each batch separately and combine results
-     dt.ccf.pairs <- rbindlist(lapply(pair_batches, function(batch) {
-       rbindlist(map2(batch,
-                      map(batch, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]], max.lag = max.lag)),
-                      ~ {
-                        data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
-                      }))
-     }))
-
-
-   }
-
-   # parallel process for large dataset
-   if (mtd.paired_ccf == "LP"){
-
-    # Number of cores (use one less than the total number of cores)
-    num_cores <- detectCores() - 1
-
-    # Parallel processing of each batch and combining results
-    dt.ccf.pairs <- rbindlist(mclapply(pair_batches, function(batch) {
-      rbindlist(map2(batch,
-                     map(batch, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]], max.lag = max.lag)),
-                     ~ {
-                       data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
-                     }))
-    }, mc.cores = num_cores))
-
+  # Decide if parallel processing is supported
+  if (available_cores > 1) {
+    plan(multisession, workers = available_cores)
+  } else {
+    plan(sequential)
   }
 
- }
+  # if batch size is not specified, run as 1 batch
+  if (is.null(batch_size)) {
+    pair_batches <- list(col_pairs)
+  }else{
+    pair_batches <- split(col_pairs, ceiling(seq_along(col_pairs) / batch_size))
+  }
+
+  # Run processing on batches with or without parallel
+  dt.ccf.pairs <- future_map(pair_batches, process_batch, dt.wide = dt.trt_wide, max.lag = 10, .progress = TRUE) %>% rbindlist()
+
 
   result_dt.sel <- dt.ccf.pairs[max_lag == 0 & !is.na(max_ccf)]
 
@@ -177,7 +131,7 @@ CFS_qa <- function(dt.input , mtd.paired_ccf = "S", batch_size = 5000, max.lag =
   # algorithm on pass
 
   s2.end <- FALSE;  i.iter <- 1;
-  while(!s2.end & i.iter <= max.trial){
+  while(!s2.end & i.iter <= max.iter){
 
     # mean of master chronology
     dt.s2.avg <- dt.rw_long[SampleID.chr %in%  id.candi][, .(.N, mean.rw = mean(RawRing)), by = .(Year)]
@@ -188,7 +142,7 @@ CFS_qa <- function(dt.input , mtd.paired_ccf = "S", batch_size = 5000, max.lag =
     # ccf of all samples with the master chronology
     dt.s2.ccf <-rbindlist(lapply(3:ncol(dt.s2.wide), ccf_avg, data = dt.s2.wide, max.lag = max.lag, qa_code = "Fail"))
     # valid samples for master chronology
-    id.pass <- unique(dt.s2.ccf[qa_code == "Pass"]$SampleID.chr)
+    id.pass <- unique(dt.s2.ccf[qa_code == "pass"]$SampleID.chr)
     # id.dif <- setdiff(union(id.candi, id.pass) ,intersect (id.candi, id.pass))
     s2.end <- length(setdiff(union(id.candi, id.pass) ,intersect (id.candi, id.pass))) == 0
     print(paste0(i.iter, " N.pass: ", length(id.candi)))
@@ -263,6 +217,10 @@ names(plot.trt.series)
   setcolorder(dt.s2.ccf, "SampleID")
   dt.s2.ccf[, SampleID.chr := NULL]
   # sample.lst.o <- str_split_fixed(sample.lst, "\\_",2)[,2]
+
+  # Reset to sequential
+  plan(sequential)
+
   return(list(dt.ccf = dt.s2.ccf, master = dt.s2.avg, plot.lst = plot.lst))
   # the result of step 2 is dt.s2.ccf, samples with qa_code = "Pass" to form the master chronology
 
@@ -327,6 +285,26 @@ ccf_avg <- function(icol, data, blcrit = 0.1, max.lag = 10, qa_code="fail"){
   return(dt.ccf)
 }
 
+
+# Define the main function to process each pair
+
+# Use map to calculate pairwise cross-correlation for each pair
+# this is the most efficient way for this calculation so far i found, 20-06-24, 2 mins for 490 series
+# system.time(ccf.pairs <- map(col_pairs, ~ ccf_pairs(dt.trt_wide[[.x[1]]], dt.trt_wide[[.x[2]]])))
+
+#' @keywords internal
+process_batch <- function(batch,dt.wide, max.lag = 10) {
+  rbindlist(
+    map2(batch,
+         map(batch, ~ ccf_pairs(dt.wide[[.x[1]]], dt.wide[[.x[2]]], max.lag = max.lag)),
+         ~ {
+           data.table(ts1 = .x[1], ts2 = .x[2], max_lag = .y$max_lag, max_ccf = .y$max_ccf)
+         }
+    )
+  )
+}
+
+#' @keywords internal
 create_plot.series <- function(icol, data) {
   if (str_detect(deparse(substitute(data)), "trt")) label <- "treated" else label <- "raw"
   sampleID<- names(data)[icol]
@@ -343,7 +321,7 @@ create_plot.series <- function(icol, data) {
 }
 
 
-
+#' @keywords internal
 create_barplot <- function(icol, data) {
   sampleID.chr <- names(data)[icol]
   if (str_detect(deparse(substitute(data)), "trt")) {

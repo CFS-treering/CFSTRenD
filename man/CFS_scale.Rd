@@ -2,19 +2,23 @@
 % Please edit documentation in R/CFSformat.R
 \name{CFS_scale}
 \alias{CFS_scale}
-\title{plot the median of tree ring measurement of 1 site and of its nearest neighbors}
+\title{compare the median of tree ring measurement of a specific site to those of nearby sites}
 \usage{
-CFS_scale(site2chk, tr_all_wide, N.nb, make.plot = FALSE)
+CFS_scale(site2chk, ref_sites, N.nbs = 10, make.plot = c(FALSE, ""))
 }
 \arguments{
 \item{site2chk}{data.table with columns uid_project, uid_site, site_id, species, longitude and latitude}
 
-\item{tr_all_wide}{reference sites including including rw measurement in wide format}
+\item{ref_sites}{reference sites including ring width measurements in wide format}
 
-\item{N.nb}{number of nearest-neighbors}
+\item{N.nbs}{number of nearest-neighbors}
 
-\item{make.plot}{plot figures (default: FALSE)}
+\item{make.plot}{a list , first item for plot figures or not, second item for the caption of data source}
+}
+\value{
+A data table containing the median ring-width measurements of the involved sites, along with the distances from the specific site
 }
 \description{
-plot the median of tree ring measurement of 1 site and of its nearest neighbors
+Apply a k-nearest neighbors (k-NN) method based on geographic location for the same species.
+It compares the median tree-ring measurements of a specific site to those of nearby sites
 }

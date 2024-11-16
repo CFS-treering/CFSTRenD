@@ -2,7 +2,7 @@
 % Please edit documentation in R/detrend_site.R
 \name{detrend_site}
 \alias{detrend_site}
-\title{species-site level of detrending BAI using gamm}
+\title{tree growth model with gamm and model selection}
 \usage{
 detrend_site(data, resp_scale = "log", m.candidates, out.csv = NULL)
 }
@@ -19,12 +19,18 @@ detrend_site(data, resp_scale = "log", m.candidates, out.csv = NULL)
 list including model, fitting statistics, ptable, stable and prediction table
 }
 \description{
-detrending BAI using gamm model with family = Gamma(link='log') and corAR1."REML" and "ML" methods are available.It can be used to compare models with aic using "ML" method.
+A wrapper function for the Generalized Additive Mixed Model (GAMM) to model annual tree growth, such as basal area increment.
+It allows for modeling the log-transformed scale of tree growth.
 }
 \details{
-If users specify multiple candidate models as input to m.candiates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
-The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
-it will be refitted using the restricted maximum likelihood (REML) method to obtain unbiased estimates of model parameters.
+The function implements tree identity as a random effect and incorporates a first-order autoregressive (AR1) correlation structure in the model.
+To address the skewness of basal area increment (BAI), a Gamma family distribution with a log link function is employed.
+When applied on the log scale of BAI, a normal distribution with an identity link function is employed,
+assuming that the log-transformed BAI follows a normal distribution.
 
-If users specify only 1 candidate model as input to m.candiates argument, the model will apply REML model directly.
+If users specify multiple candidate models through the m.candiates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
+The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
+it will be refitted using the restricted maximum likelihood (REML) method.
+
+If users specify only 1 candidate model through the m.candiates argument, the model is fitted with "REML" method.
 }

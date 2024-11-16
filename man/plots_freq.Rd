@@ -4,12 +4,14 @@
 \alias{plots_freq}
 \title{plot frequency distribution by geo-location per species}
 \usage{
-plots_freq(dt.freq, out.species = "all", out.pdf = NULL)
+plots_freq(dt.freq, out.species = "all", caption = "", out.pdf = NULL)
 }
 \arguments{
 \item{dt.freq}{a table resulting from function CFS_freq()}
 
 \item{out.species}{species list, default is 'all' to output all species}
+
+\item{caption}{caption of data source}
 
 \item{out.pdf}{output file name including path/filename.pdf, default is NULL for screen display}
 }

@@ -2,22 +2,22 @@
 % Please edit documentation in R/CFSformat.R
 \name{CFS_freq}
 \alias{CFS_freq}
-\title{frequency distributions based on species and geo-location}
+\title{frequency distributions by geo-location per species}
 \usage{
-CFS_freq(tr_meta, uid_level, cutoff_yr, geo_resolution = c(5, 5))
+CFS_freq(tr_meta, uid_level, cutoff_yr = -999, geo_resolution = c(5, 5))
 }
 \arguments{
 \item{tr_meta}{meta table from function CFS_format()}
 
 \item{uid_level}{which uid level to count(uid_project, uid_site, uid_tree, uid_meas, uid_sample, uid_radius)}
 
-\item{cutoff_yr}{cut-off year from which series were recorded on or after}
+\item{cutoff_yr}{cut-off year for a subset which series were recorded on or after}
 
 \item{geo_resolution}{resolution of longitude and latitude in degree, default: c(5,5)}
 }
 \value{
-a data table of counts of uid by species-lat * lon
+a data table of counts of uid by latitude-longitude per species
 }
 \description{
-frequency distributions based on species and geo-location
+frequency distributions by geo-location per species
 }

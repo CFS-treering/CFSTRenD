@@ -2,54 +2,44 @@
 % Please edit documentation in R/quality_assessment.R
 \name{CFS_qa}
 \alias{CFS_qa}
-\title{tree ring data quality classification and master chronology}
+\title{tree-ring data measurement assessment}
 \usage{
-CFS_qa(
-  dt.input,
-  mtd.paired_ccf = "S",
-  batch_size = 5000,
-  max.lag = 10,
-  max.trial = 100
-)
+CFS_qa(dt.input, batch_size = 10000, max.lag = 10, max.iter = 100)
 }
 \arguments{
 \item{dt.input}{tree ring data with at least 3 columns (SampleID, Year, RawRing)}
 
-\item{mtd.paired_ccf}{processing approach for paired ccf c("S", "LB", "LP")}
+\item{batch_size}{number of pairs to run in a batch, to avoid memory issues in processing large dataset}
 
-\item{batch_size}{batch size for processing large dataset}
+\item{max.lag}{maximum lag up to which the correlation should be calculated in CCF}
 
-\item{max.lag}{maximum lag for ccf}
-
-\item{max.trial}{maximum loop for step 2 to form the master dendrochronology}
+\item{max.iter}{maximum number of iterations of step 2(see Details)}
 }
 \value{
-dt.ccf:	A data table containing the CCF results for all samples, including the quality assessment code (qa_code).
-
-master:	The final master chronology, including both raw master chronology, the mean of ring measurement of the series with pass, and the treated  master chronology, calculated as the difference of two consecutive raw master chronology.
-
-plot.lst:	plots of the raw and treated ring measurements with year, along with the CCF plots for each sample.
+A list of 3 elements:
+1) dt.ccf:	A data table containing the CCF results for all samples, including the quality assessment code (qa_code).
+2) master:	The final master chronology, including both raw master chronology, the mean of ring measurement of the series with pass,
+and the treated  master chronology, calculated as the difference of two consecutive raw master chronology.
+3) plot.lst:	plots of the raw and treated ring measurements with year, along with the CCF plots for each sample.
 }
 \description{
-classify tree ring data in five classes ("pass","borderline", "pm1", "highpeak", "fail") using the difference series.
+Assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
 }
 \details{
-We present a simple algorithm to assess measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
+Assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
 The algorithm consists of two main steps:
 
- Step 1. Initial treated master chronology
-
- Perform pairwise CCF on the treated series of all possible combinations of the samples.
- The pair which meets the criteria is qualified for the master chronology calculation.
- We then calculate the raw ring master chronology by averaging the ring measurements of these selected samples.
+ Step 1. Perform pairwise CCF on the treated series of all possible combinations of the samples.
+raw ring master chronology is calculated as the average of the ring measurements of samples that achieve the maximum correlation at lag 0 with at least one other sample in the cross-correlation function (CCF).
  The difference series of the raw ring master chronology is used as the initial treated master chronology for next step.
 
- Step 2. Refinement on Master Chronology
-
- Perform CCF between the treated series of each sample and the initial treated master chronology.
+ Step 2. Perform CCF between the treated series of each sample and the initial treated master chronology.
  Samples that do not meet the criteria will be removed from the recalculation of the treated master chronology.
-
- This process is repeated until all remaining samples in the master chronology meet the criteria.
+ This step is repeated until all remaining samples in the master chronology meet the criteria.
 
 This process results in five categories classification for all samples (pass, borderline, pm1, highpeak, fail)
+
+
+To enhance efficiency and mitigate potential memory issues,
+The function supports both parallel (multi-session) and sequential modes, and also offers a batch processing option for users.
 }

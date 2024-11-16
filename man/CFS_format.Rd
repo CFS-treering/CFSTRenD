@@ -2,18 +2,24 @@
 % Please edit documentation in R/CFSformat.R
 \name{CFS_format}
 \alias{CFS_format}
-\title{convert data to CFS-TRenD format}
+\title{Convert tree-ring data into CFS-TRenD format}
 \usage{
-CFS_format(data, out.csv = FALSE)
+CFS_format(data, out.csv = NULL)
 }
 \arguments{
 \item{data}{a list, first is input data in wide format; second is a flat sequence referring to the column indices of ring measurement variables}
 
-\item{out.csv}{output csv file (TRUE or FALSE)}
+\item{out.csv}{output csv file (default is NULL, otherwise to specify the directory to output)}
 }
 \value{
-7 tables starting with tr_
+A list of 3 elements:
+1) A list containing seven tables compatible with CFS-TRenD data structure;
+2) A data table containing all the meta-data and ring width measurement in wide format;
+3) A data table for the percentage of completeness of each variable.
 }
 \description{
-convert data to CFS-TRenD format
+converts tree-ring data from various formats into a format compatible with hierarchical structure of the CFS-TRenD data collection (Girardin et al., 2021).
+}
+\references{
+Girardin, M.P., Guo, X.J., Metsaranta, J., Gervais, D., Campbell, E., Arsenault, A., Isaac-Rentone, M., Harvey, J.E., Bhatti, J., Hogg, E.A. 2021. A national tree-ring repository for Canadian forests (CFS-TRenD): structure, synthesis and applications. Environmental Reviews, 29 (999), 1-17. https://doi.org/10.1139/er-2020-0099
 }
