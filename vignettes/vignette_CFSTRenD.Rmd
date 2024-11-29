@@ -107,36 +107,36 @@ plots_qa(qa.trt.ccf$plot.lst, out.series = c("5"), out.pdf = NULL )
 
 ```{r}
 
-samples69_clim <- merge(samples69.trt$tr_all_wide[, c("uid_site", "site_id", "species", "uid_tree", "uid_radius")], samples69.trt$tr_all_long$tr_7_ring_widths, by = "uid_radius")
-# Calculate BAI
-setorder(samples69_clim, uid_radius, year)
-samples69_clim[, .N, by = .(uid_radius, year)][N>1]
-samples69_clim[, `:=`(ageC = seq_len(.N),
-  radius = cumsum(rw_mm),  # Cumulative radius (assumes RW is added each year)
-          radius_prev = shift(cumsum(rw_mm), fill = 0)), by = uid_radius]  # Previous radius (shifted)
-
-# Compute BA in cm2
-samples69_clim[, ba_cm2_t_1 := pi * (radius_prev^2)/100]
-
-samples69_clim[, bai_cm2 := pi * (radius^2 - radius_prev^2)/100]
-
-
-# Drop the radius columns if not needed
-samples69_clim[, c("radius", "radius_prev") := NULL]
-
-samples69_clim <- merge(samples69_clim, clim69, by = c("site_id", "year"))
-
-samples69_clim[, uid_tree.fac:= as.factor(as.character(uid_tree))]
-setorder(samples69_clim, uid_tree, year)
-# choose 1 site, ignore the first 10 years as Girardin 2022
-site.i <- samples69_clim[uid_site == 10][ageC > 10]
-det.i <- detrend_site(data = site.i, 
-             m.candidates = c(
-  "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC)",
-  "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC) + FFD",
-  "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC) + s(FFD)"
-  
-)
-)
-print(summary(det.i$model$gam))
+# samples69_clim <- merge(samples69.trt$tr_all_wide[, c("uid_site", "site_id", "species", "uid_tree", "uid_radius")], samples69.trt$tr_all_long$tr_7_ring_widths, by = "uid_radius")
+# # Calculate BAI
+# setorder(samples69_clim, uid_radius, year)
+# samples69_clim[, .N, by = .(uid_radius, year)][N>1]
+# samples69_clim[, `:=`(ageC = seq_len(.N),
+#   radius = cumsum(rw_mm),  # Cumulative radius (assumes RW is added each year)
+#           radius_prev = shift(cumsum(rw_mm), fill = 0)), by = uid_radius]  # Previous radius (shifted)
+# 
+# # Compute previous BA in cm2
+# samples69_clim[, ba_cm2_t_1 := pi * (radius_prev^2)/100]
+# 
+# samples69_clim[, bai_cm2 := pi * (radius^2 - radius_prev^2)/100]
+# 
+# 
+# # Drop the radius columns if not needed
+# samples69_clim[, c("radius", "radius_prev") := NULL]
+# 
+# samples69_clim <- merge(samples69_clim, clim69, by = c("site_id", "year"))
+# 
+# samples69_clim[, uid_tree.fac:= as.factor(as.character(uid_tree))]
+# setorder(samples69_clim, uid_tree, year)
+# # choose 1 site, ignore the first 10 years as Girardin 2022
+# site.i <- samples69_clim[uid_site == 10][ageC > 10]
+# det.i <- detrend_site(data = site.i, 
+#              m.candidates = c(
+#   "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC)",
+#   "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC) + FFD",
+#   "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC) + s(FFD)"
+#   
+# )
+# )
+# print(summary(det.i$model$gam))
 ```

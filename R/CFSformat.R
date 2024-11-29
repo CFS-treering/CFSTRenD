@@ -190,7 +190,9 @@ if (length(add.Vars) > 0) {
         write.csv(eval(parse(text = fn7[i.tbl])), file =file.path(out.csv, paste0(fn7[i.tbl], ".csv" )), na = "",  row.names = FALSE)
 
       }
+      write.csv(tr_all_wide, file =file.path(out.csv, paste0("tr_all_wide", ".csv" )), na = "",  row.names = FALSE)
       write.csv(complete_vars, file =file.path(out.csv, paste0("complete_vars", ".csv" )), na = "",  row.names = FALSE)
+
 
       }
 

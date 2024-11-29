@@ -19,7 +19,9 @@ utils::globalVariables(c(
   "block_id","rw.N.sc",
   "acf.trt", "ccf.ord", "max_lag", "max_ccf", "SampleID.chr", "RawRing", "Year",
   "mean.rw.dif","mean.rw", "dt.trt.wide", "qa_code", "col.ord",
-  "SampleID",  "colr", "id.label", "rw.treated"
+  "SampleID",  "colr", "id.label", "rw.treated",
+  "ageC", "res.normalized", "res.normalized.LL",  "res.resp_normalized",
+  "lat_use", "lon_use", "start.event"
   )
 )
 

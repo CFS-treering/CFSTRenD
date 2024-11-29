@@ -102,6 +102,7 @@ write.csv(aic.all, file =  file.path(out.csv, paste0("fitting ML.csv")), row.nam
   names(fit.bai) <- c("fit.bai", "se.fit.bai")
   tmp.bai <- data.table(data, pred.terms, fit.bai)
   tmp.bai$res.bai <- residuals(m.sel$gam, type = "response")
+  tmp.bai$res.bai_normalized <- residuals(m.sel$gam, type = "normalized")
 
   tmp.bai[, c("lci_bai", "uci_bai") := .(
     fit.bai - qnorm(0.975) * se.fit.bai,
