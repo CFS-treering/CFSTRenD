@@ -4,19 +4,21 @@
 #'
 #' @param plot.lst plot list from generate_plots
 #' @param out.series SampleID list to be plotted, default -999 for output all samples
+#' @param caption caption of the plots
 #' @param out.pdf output file name including path/filename.pdf, default NULL for device screen
 
 
 
 #' @import data.table
 #' @import gridExtra
+#' @import patchwork
 #' @importFrom grDevices dev.off pdf
 
 #' @export plots_qa
 
-plots_qa <- function(plot.lst, out.series = "all", out.pdf= NULL ) {
+plots_qa <- function(plot.lst, out.series = "all", caption = "CFS-TRenD V1.2 samples69", out.pdf= NULL ) {
 
-
+  if (nchar(caption) == 0) stop("please specify caption")
 
   samples.all <- names(plot.lst$plot.raw.series)
 
@@ -38,8 +40,22 @@ plots_qa <- function(plot.lst, out.series = "all", out.pdf= NULL ) {
 
     # Loop through the plot lists and arrange them on each page
     for (i in idx.lst) {
-      plots <- list(plot.lst$plot.raw.series[[i]], plot.lst$plot.trt.series [[i]], plot.lst$plot.raw.ccf[[i]], plot.lst$plot.trt.ccf[[i]])
-      grid.arrange(grobs = plots, ncol = 2, nrow = 2)
+      # plots <- list(plot.lst$plot.raw.series[[i]], plot.lst$plot.trt.series [[i]], plot.lst$plot.raw.ccf[[i]], plot.lst$plot.trt.ccf[[i]])
+      # grid.arrange(grobs = plots, ncol = 2, nrow = 2)
+    p.i<-  (plot.lst$plot.raw.series[[i]] | plot.lst$plot.trt.series [[i]]) / (plot.lst$plot.raw.ccf[[i]] | plot.lst$plot.trt.ccf[[i]]) +
+        plot_annotation(
+          title = paste0("SampleID: ", samples.all[idx.lst[1]]) ,
+          caption = paste0("Data source: ", caption),
+          tag_levels = 'a',
+          tag_suffix = ")") &
+        theme(
+          plot.title = element_text(face = "bold"),
+          plot.tag = element_text(face = "bold"),
+          plot.caption = element_text(hjust = 0.2, face = "italic" )
+
+          # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
+          )
+    print(p.i)
     }
 
   # Close the PDF device

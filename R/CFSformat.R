@@ -57,9 +57,9 @@ CFS_format <- function (data, out.csv = NULL) {
     # meta data
     dt.meta <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,-data[[2]], with = FALSE])
     # tree ring
-    dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,data[[2]], with = FALSE])
+    dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),radius_id = data[[1]]$radius_id, data[[1]][,data[[2]], with = FALSE])
 
-    dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp"))[!is.na(value)]
+    dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp", "radius_id"))[!is.na(value)]
     setnames(dt.rwl, "value", "rw_mm")
     dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
 
@@ -121,17 +121,55 @@ if (length(add.Vars) > 0) {
 
   setDT(dt.new)
   dt.new[, uid_project := .GRP, by = .(project_name)]
+  # chk site
+  site_LL <- dt.new[, .N, by = .(site_id, latitude, longitude)]
+  dup.LL <- site_LL[, .N, by = .(site_id)][N>1]
+  dup.site <- site_LL[, .N, by = .(latitude, longitude)][N>1]
+  if (nrow(dup.LL) > 0) stop(paste0("site_id: ", paste(dup.LL$site_id, collapse = ", "), " associated with multiple lat-lon. please verify..."))
+  if (nrow(dup.site) > 0) {
+    dup.site[, coord:= paste0("(", longitude, ", ", latitude, ")")]
+    stop(paste0("lon-lat: ", paste(dup.site$coord, collapse = ", "), " associated with multiple site_id. please verify..."))
+  }
+# Canada's boundaries are roughly:
+#
+# Latitude range: 41.7°N to 83.1°N
+# Longitude range: 52.6°W to 141.0°W
+# source:  https://www12.statcan.gc.ca/census-recensement/2011/ref/dict/geo016-eng.cfm
+
+  if (min(dt.new$latitude) < 41.7 | max(dt.new$latitude) > 83.1) stop(paste0("latitude not in range: (41.7 , 83.1)"))
+  if (min(dt.new$longitude) < -141 | max(dt.new$longitude) > -52.6) stop(paste0("longitude not in range: (-141 , -52.6)"))
 
   dt.new[, uid_site := .GRP, by = .(site_id, latitude, longitude)]
 
+  chk.spc<-dt.new[, .N, by = .(site_id, tree_id, species)][, .N, by = .(site_id, tree_id)][N > 1]
+
+  if (nrow(chk.spc) > 0) {
+    chk.spc[, site.tree:= paste0(site_id, "$", tree_id)]
+    stop(paste0("site$tree: ", paste(chk.spc$site.tree, collapse = ", ")), " associated with multiple species, please verify...")
+    }
+  # chk if species is included in species_nficode
+  # species_nficode is the species list of tree source, and was saved as internal data
+  chk.spc2 <- setdiff(unique(dt.new$species), species_nficode$nfi_species_code)
+  if (length(chk.spc2)  > 0) stop(paste0("species: ", paste(chk.spc2, collapse = ", "), " not recognized, please verify..."))
 
   dt.new[, uid_tree := .GRP, by = .(uid_project, uid_site, tree_id)]
+
+
   dt.new[, uid_meas := .GRP, by = .(uid_tree, meas_no)]
   dt.new[, uid_sample := .GRP, by = .(uid_meas, sample_id)]
 
   dt.new[, uid_radius := .GRP, by = .(uid_sample, radius_id)]
 
   ys <- dt.rwl[, .(rw_ystart = min(year), rw_yend = max(year)), by = c("uid_radius.tmp")]
+  setorder(dt.rwl, uid_radius.tmp, year)
+  dt.rwl[, ydif:= year - shift(year), by = "uid_radius.tmp"]
+  dt.rwl[, rwinc:= rw_mm - shift(rw_mm), by = "uid_radius.tmp"]
+  chk.ydif <- dt.rwl[, .SD[-1], by = uid_radius.tmp][is.na(ydif)][, .N, by = .(radius_id)]
+  if (nrow(chk.ydif) > 0) stop(paste0("radius_id: ", paste(chk.ydif$radius_id, collapse = ", "), " with missing year, please verify..." ))
+  # str(dt.rwl)
+  chk.rw <- dt.rwl[ rw_mm < 0][, .N, by = .(radius_id)]
+  if (nrow(chk.rw) > 0) stop(paste0("radius_id: ", paste(chk.ydif$radius_id, collapse = ", "), " with negative rw measurement, please verify..." ))
+
   dt.new <- dt.new[ys, on = .(uid_radius.tmp)]
   dt.new[, c("ymin.proj", "ymax.proj"):= .(min(rw_ystart), max(rw_yend) ), by = .(uid_project)]
   dt.new[, yr.meas:= max(ys), by = .(uid_meas)]
@@ -217,6 +255,7 @@ if (length(add.Vars) > 0) {
 #' @import data.table
 #' @import stringr
 #' @import RANN
+#' @importFrom scales pretty_breaks
 #' @import patchwork
 #'
 #' @return A data table containing the median ring-width measurements of the involved sites, along with the distances from the specific site
@@ -252,7 +291,21 @@ CFS_scale <- function(site2chk, ref_sites, N.nbs = 10, make.plot = c(FALSE, ""))
   med.site.yr <- merge(med.site.yr, uid_site.closest, by = c("uid_project", "uid_site"))
 
   chk.site <- merge(uid_site.closest, med.site, by = c("uid_project", "uid_site"))
-  # setnames(chk.site, c("chk.site", "uid_site"), c("uid_site", "uid_site.nb"))
+
+  # ratio defines as site2chk/neighbor , when it's smaller means the site2chk's magnitude is smaller,
+  chk.site$rw.ratio <- chk.site[ord == 0]$rw.median/chk.site$rw.median
+
+  chk.site$size_class <- cut(
+    chk.site$rw.ratio,
+    breaks = c(-Inf, 0.1, 0.2, 0.5, 2, 5, 10, Inf), # Define the breaks
+    labels = c("< 0.1", "0.1 - 0.2", "0.2 - 0.5", "0.5 - 2", "2 - 5", "5 - 10", "> 10"), # Define labels
+    include.lowest = TRUE
+  )
+  if (any(is.na(chk.site$size_class))) {
+    warning("Some values in rw.ratio are outside the defined breaks and will be excluded.")
+  }
+
+
   setorder(med.site.yr, ord, uid_project, uid_site, year)
 
   rw.median <- data.table(chk.site[ord == 0][,c("uid_project", "uid_site","species", "rw.median")],
@@ -268,40 +321,46 @@ CFS_scale <- function(site2chk, ref_sites, N.nbs = 10, make.plot = c(FALSE, ""))
     theme(legend.position = "right",
           plot.caption = element_text(hjust = 0, face = "italic")) +  # Position the legend on the right
 
-    labs(title = paste0( site2chk$species, "  (uid_site: ", site2chk$uid_site, ")" ),
+    labs(
+            y = "rw.median (mm)"
 
-         y = "rw.median(mm)",
-         caption = paste0("Data source: ", make.plot[2])  # Add the data source caption
     )
 
 
-  g1 <- ggplot(chk.site, aes(x = longitude, y = latitude, size = rw.median)) +
-    geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")), alpha = 0.6) +
-    scale_color_identity() + #  Use the actual colalpha = 0.6, color = "darkblue") +
-    # scale_shape_manual(values = c("circle" = 20)) + # Map "circle" to shape 16 and "cross" to shape 4
-    scale_size_continuous(range = c(1, 20)) + #+  Adjust size range as needed
-    # scale_x_continuous(breaks = sort(unique(data.tmp$lon)))
-
-
+  g1 <- ggplot(chk.site, aes(x = longitude, y = latitude, size = size_class)) +
+    geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")), alpha = 1) +
+    scale_color_identity() + # Use the actual colors
+    scale_size_manual(
+      values = c("< 0.1" = 1, "0.1 - 0.2" = 2, "0.2 - 0.5" = 3, "0.5 - 2" = 5, "2 - 5" = 7, "5 - 10" = 9, "> 10" = 11), # Map size classes to point sizes
+      name = "ratio(./nb)"
+    ) +
+    scale_x_continuous(breaks = pretty_breaks(n = 3), expand = expansion(mult = 0.3)) +
+    scale_y_continuous(breaks = pretty_breaks(n = 5), expand = expansion(mult = 0.2)) +
     theme_minimal() +
-    theme(strip.text = element_text(size = 16),# Increase the size of facet labels
-          panel.grid.minor = element_blank() , # Remove minor grid lines
-          plot.title = element_text(size = 18), # Set title size
-          plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt"), # Adjust plot margins
-          plot.caption = element_text(hjust = 0, face = "italic")) + # Customize caption appearance
-
+    theme(
+      strip.text = element_text(size = 16), # Increase the size of facet labels
+      panel.grid.minor = element_blank(), # Remove minor grid lines
+      plot.title = element_text(size = 18) # Set title size
+    ) +
     labs(
       x = "Longitude",
-      y = "Latitude",
-      # caption = paste0("Data source: CFS-TRenD ", ver.tr) , # Add the data source caption
-      size = paste0("rw median(mm)"))
-  # labs()
-  # +
-  # geom_text(aes(label = ifelse(ord %in% c(0, 1), as.character(round(rw.median, 1)), "")),
-  # hjust = 0.5, vjust = -1, check_overlap = TRUE)
+      y = "Latitude"
+    )
 
-  # gridExtra::grid.arrange(g2, g1, ncol = 2)
-  print(g2 + g1 + plot_layout(widths = c(1.2, 1)))
+
+  print(g2 + g1 + plot_layout(widths = c(1.2, 1)) +
+          plot_annotation(
+            title = paste0( "uid_site ", site2chk$uid_site, " and its ", N.nbs, " neighbors ( species: ", site2chk$species, ")"  ),
+            caption = paste0("Data source: ", make.plot[2]),
+            tag_levels = 'a',
+            tag_suffix = ")") &
+          theme(
+            plot.title = element_text(face = "bold"),
+            plot.tag = element_text(face = "bold"),
+            plot.caption = element_text(hjust = 0.2, vjust = -1, face = "italic" )
+
+            # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
+            ))
   }
   setnames(chk.site, "uid_site", "uid_site.nb")
   chk.site<- data.table(rw.median[, "uid_site"], chk.site)

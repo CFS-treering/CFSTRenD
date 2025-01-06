@@ -62,14 +62,14 @@
 
 CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
 
-  if (length(setdiff(c("SampleID", "Year","RawRing" ), names(dt.input))) > 0) stop("at least one of the mandatory columns (SampleID, Year, RawRing) doesn't exist, please check...")
+  if (length(setdiff(c("SampleID", "Year","RawRing", "RW_trt" ), names(dt.input))) > 0) stop("at least one of the mandatory columns (SampleID, Year, RawRing, RW_trt) doesn't exist, please check...")
 
 
   if (nrow(dt.input[, .N, by = .(SampleID, Year)][N > 1]) > 0) stop("SampleID-Year is not unique key, please check...")
-  dt.rw_long <- dt.input[, c("SampleID", "Year","RawRing" )]
+  dt.rw_long <- dt.input[, c("SampleID", "Year","RawRing", "RW_trt")]
   setorder(dt.rw_long, SampleID,Year)
-  # the series to be used for ccf
-  dt.rw_long[, rw.treated:= RawRing - shift(RawRing), by = SampleID]
+  # the series to be used for ccf should be in dt.input 2024-12-10
+  # dt.rw_long[, RW_trt:= RawRing - shift(RawRing), by = SampleID]
 
   # SampleID.chr is the key sampleID, we use it in the functions to represent a sample.
   # starting with a character to ensure the validity as column name and value of a column
@@ -78,8 +78,8 @@ CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
   setorder(dt.rw_long, SampleID.chr)
   sample.lst <- sort(unique(dt.rw_long$SampleID.chr))
 
-  dt.rw_wide <- dcast(dt.rw_long[!is.na(rw.treated)], Year ~ SampleID.chr, value.var = "RawRing")
-  dt.trt_wide <- dcast(dt.rw_long[!is.na(rw.treated)], Year ~ SampleID.chr, value.var = "rw.treated")
+  dt.rw_wide <- dcast(dt.rw_long[!is.na(RW_trt)], Year ~ SampleID.chr, value.var = "RawRing")
+  dt.trt_wide <- dcast(dt.rw_long[!is.na(RW_trt)], Year ~ SampleID.chr, value.var = "RW_trt")
 
   setcolorder(dt.trt_wide, c("Year", sample.lst))
 
@@ -113,8 +113,11 @@ CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
   }
 
   # Run processing on batches with or without parallel
+ cat("Progress pair-wise ccf...\n")
   dt.ccf.pairs <- future_map(pair_batches, process_batch, dt.wide = dt.trt_wide, max.lag = 10, .progress = TRUE) %>% rbindlist()
 
+
+  cat("\n")
 
   result_dt.sel <- dt.ccf.pairs[max_lag == 0 & !is.na(max_ccf)]
 
@@ -134,11 +137,14 @@ CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
   while(!s2.end & i.iter <= max.iter){
 
     # mean of master chronology
-    dt.s2.avg <- dt.rw_long[SampleID.chr %in%  id.candi][, .(.N, mean.rw = mean(RawRing)), by = .(Year)]
-    setorder(dt.s2.avg, Year)
-    dt.s2.avg [, mean.rw.dif:= mean.rw - shift(mean.rw)]
+    # dt.s2.avg <- dt.rw_long[SampleID.chr %in%  id.candi][, .(.N, mean.rw = mean(RawRing)), by = .(Year)]
+    # setorder(dt.s2.avg, Year)
+    # dt.s2.avg [, mean.rw.dif:= mean.rw - shift(mean.rw)]
 
-    dt.s2.wide <- merge(dt.s2.avg[, c("Year", "mean.rw.dif")], dt.trt_wide.o, by = "Year")
+    # mean of treated chronology as master chronology 2024-12-10
+    dt.s2.avg <- dt.rw_long[SampleID.chr %in%  id.candi][, .(.N, mean.rw = mean(RawRing), mean.rw_trt = mean(RW_trt, na.rm = TRUE)), by = .(Year)]
+
+    dt.s2.wide <- merge(dt.s2.avg[, c("Year", "mean.rw_trt")], dt.trt_wide.o, by = "Year")
     # ccf of all samples with the master chronology
     dt.s2.ccf <-rbindlist(lapply(3:ncol(dt.s2.wide), ccf_avg, data = dt.s2.wide, max.lag = max.lag, qa_code = "Fail"))
     # valid samples for master chronology
@@ -159,10 +165,10 @@ CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
   # for generating plots
   # pre series data for both rw and treated in wide format
   dt.raw.series <- merge(dt.s2.avg[, c("Year", "mean.rw")], dt.rw_wide, by = "Year")
-  dt.trt.series <- merge(dt.s2.avg[, c("Year", "mean.rw.dif")], dt.trt_wide.o, by = "Year")
+  dt.trt.series <- merge(dt.s2.avg[, c("Year", "mean.rw_trt")], dt.trt_wide.o, by = "Year")
 
   setcolorder(dt.raw.series, c("Year", "mean.rw", sample.lst))
-  setcolorder(dt.trt.series, c("Year", "mean.rw.dif", sample.lst))
+  setcolorder(dt.trt.series, c("Year", "mean.rw_trt", sample.lst))
 
 
   # pre data for bar plotting on ccf with master for raw and treated series
@@ -306,15 +312,22 @@ process_batch <- function(batch,dt.wide, max.lag = 10) {
 
 #' @keywords internal
 create_plot.series <- function(icol, data) {
-  if (str_detect(deparse(substitute(data)), "trt")) label <- "treated" else label <- "raw"
+  if (str_detect(deparse(substitute(data)), "trt")) {
+
+    label <- "treated "}else{
+
+      label <- "raw"}
   sampleID<- names(data)[icol]
   p <- ggplot(data, aes(x = Year)) +
     geom_line(aes(y = get(sampleID), color = 'Tree'), na.rm = TRUE) +
     geom_point(aes(y = get(sampleID), color = 'Tree'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
     geom_line(aes(y = get(names(data)[2]), color = 'Master'), na.rm = TRUE) +
     geom_point(aes(y = get(names(data)[2]), color = 'Master'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
-    labs(title = paste(label," ", str_sub(sampleID, 3)),
-         x = "Year", y = paste0(label, " rw"),
+    labs(
+      # title = paste(label," ", str_sub(sampleID, 3)),
+      # title = bquote(bold(.(a_d)) ~ .(label) ~ .(str_sub(sampleID, 3))),
+      #
+         x = "Year", y = paste0(label, " rw (mm)"),
          color = "Series") +
     theme_minimal()
   return(p)
@@ -329,6 +342,7 @@ create_barplot <- function(icol, data) {
     test <- parts[, 2]
     lagmax <- as.integer(parts[, 3])
     sampleID.o <- parts[, 1]
+
     label <- "treated"
     dt.clrs <- data.table(lag = -10:10)
     dt.clrs[, colr:= ifelse(lag == lagmax, "red", "black")]
@@ -351,7 +365,10 @@ create_barplot <- function(icol, data) {
     geom_bar(stat = "identity",na.rm = TRUE) +
     scale_fill_manual(values = clrs) +
     # scale_fill_manual(values = clrs) +
-    labs(title = paste("ccf_", label, " ", sampleID.o, " ", test),
+    labs(
+      # title = bquote(bold(.(a_d)) ~ "ccf_" * .(label) ~ .(sampleID.o) ~ .(test)),
+         # title = bquote(bold(.(var)) ~ "ccf" * .(label))
+      title = ifelse(label == "raw", "", paste( " qa_code: ", test)),
          x = "lag", y = paste0("correlation with ", label, " master"),
          color = "Series") +
     ylim(-1, 1) +

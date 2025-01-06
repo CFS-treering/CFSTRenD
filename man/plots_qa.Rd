@@ -4,12 +4,19 @@
 \alias{plots_qa}
 \title{plotting quality assessment}
 \usage{
-plots_qa(plot.lst, out.series = "all", out.pdf = NULL)
+plots_qa(
+  plot.lst,
+  out.series = "all",
+  caption = "CFS-TRenD V1.2 samples69",
+  out.pdf = NULL
+)
 }
 \arguments{
 \item{plot.lst}{plot list from generate_plots}
 
 \item{out.series}{SampleID list to be plotted, default -999 for output all samples}
+
+\item{caption}{caption of the plots}
 
 \item{out.pdf}{output file name including path/filename.pdf, default NULL for device screen}
 }

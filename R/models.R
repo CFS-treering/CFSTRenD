@@ -223,7 +223,7 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
         data[, start.event := c(TRUE, rep(FALSE, .N - 1)), by = .(uid_site, uid_tree)]
         # r1 <- start_value_rho(m0, plot=TRUE)
         # print (paste0(Sys.time(), "          ar1"))
-        m.tmp <- bam(formul, data=data, rho=start_value_rho(m0.sel, plot=FALSE), AR.start=data$start.event, method = "ML")
+        m.tmp <- bam(formul, data=data, rho=start_value_rho(m0.tmp, plot=FALSE), AR.start=data$start.event, method = "ML")
 
         rm(m0.tmp)
         # Reset to sequential
@@ -396,6 +396,13 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
 
   if (m.option < 4){
   pred.terms  <-as.data.frame( predict(m.sel$gam, type="terms",se.fit=TRUE))
+  rhs_terms <- attr(terms(m.sel$gam$formula), "term.labels")
+  # to set column names for only 1 term, by default it's s.year. and s.year.1 for s(year), instead of fit and se.fit
+  if (length(rhs_terms) == 1){
+
+  names(pred.terms) <-paste0(c("fit.", "se.fit."), sub("s\\(([^,\\)]+).*", "\\1", rhs_terms))
+  }
+
   fit.y <- as.data.frame(predict(m.sel$gam, type = "response", se.fit = TRUE))
   names(fit.y) <- c("fit.resp", "se.fit.resp")
   tmp.y <- data.table(data, pred.terms, fit.y)
