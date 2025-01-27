@@ -218,16 +218,38 @@ names(plot.trt.series)
   # return(list(plot.raw.series = plot.raw.series, plot.trt.series = plot.trt.series, plot.raw.ccf = plot.raw.ccf, plot.trt.ccf = plot.trt.ccf))
 
 
-
+  # for statistics per radius
   dt.s2.ccf[, SampleID := str_split_fixed(SampleID.chr, "\\_",2)[,2] ]
-  setcolorder(dt.s2.ccf, "SampleID")
+
+
+  # reports on radii
+  dt.radii <- dt.rw_long[, .(N = .N, rw.mean = mean(RawRing), rw.sd = sd(RawRing), rw.min = min(RawRing), rw.max = max(RawRing), ymin = min(Year), ymax = max(Year), ar1_rw = acf(RawRing, plot = FALSE)$acf[2] ), by = .(SampleID.chr)]
+
+  acf.trt <- dt.rw_long[!is.na(RW_trt), .( ar1_trt = round(acf(RW_trt, plot = FALSE)$acf[2],2) ), by = .(SampleID.chr)]
+
+  # correlations
+  dt_wide.rw <- merge(dt.s2.avg[, c("Year", "mean.rw")], dt.rw_wide, by = "Year")
+  dt_wide.trt <- merge(dt.s2.avg[, c("Year", "mean.rw_trt")], dt.trt_wide.o, by = "Year")
+
+  dt.cor <- merge(cor_avg(dt_wide.rw), cor_avg(dt_wide.trt), by = "SampleID.chr")
+
+  stats_radii <- merge(dt.radii, acf.trt, by = "SampleID.chr")
+
+
+  stats_radii <- merge(stats_radii, dt.cor, by = "SampleID.chr")
+
+
+  stats_radii <- merge(dt.s2.ccf[lag == 0, c("SampleID", "SampleID.chr", "qa_code")], stats_radii, by = "SampleID.chr")
+
+
   dt.s2.ccf[, SampleID.chr := NULL]
-  # sample.lst.o <- str_split_fixed(sample.lst, "\\_",2)[,2]
+  setcolorder(dt.s2.ccf, "SampleID")
+  stats_radii[, SampleID.chr := NULL]
 
   # Reset to sequential
   plan(sequential)
 
-  return(list(dt.ccf = dt.s2.ccf, master = dt.s2.avg, plot.lst = plot.lst))
+  return(list(dt.ccf = dt.s2.ccf, master = dt.s2.avg, plot.lst = plot.lst, dt.stats = stats_radii))
   # the result of step 2 is dt.s2.ccf, samples with qa_code = "Pass" to form the master chronology
 
 }
@@ -375,6 +397,41 @@ create_barplot <- function(icol, data) {
     theme_minimal() +
     theme(legend.position = "none")
   return(p)
+}
+
+# Helper function column-wise correlation with mean
+cor_avg <- function(data){
+  # Helper function using cor.test
+  cor_with_stats <- function(x, y) {
+    valid <- complete.cases(x, y)  # Remove NA values
+    x <- x[valid]
+    y <- y[valid]
+
+    if (length(x) > 2) {
+      test <- cor.test(x, y)
+      list(corr = test$estimate, n = length(x), p_value = test$p.value)
+    } else {
+      list(corr = NA, n = length(x), p_value = NA)  # Insufficient data
+    }
+  }
+  label <- tail(str_split(deparse(substitute(data)), "\\.")[[1]], 1)
+
+
+
+  corr_stats <- lapply(3:ncol(data), function(i) {
+    cor_with_stats(data$mean.rw, data[[i]])
+  })
+
+  # Create data.table with the results
+  correlations_df <- data.table(
+    SampleID.chr = names(data)[3:ncol(data)],
+    corr_mean = round(sapply(corr_stats, function(x) x$corr),2),
+    ncorr_mean = sapply(corr_stats, function(x) x$n),
+    pcorr_mean = round(sapply(corr_stats, function(x) x$p_value),2)
+  )
+  names(correlations_df)[-1] <- paste0(names(correlations_df)[-1], "_", label)
+  return(correlations_df)
+
 }
 
 

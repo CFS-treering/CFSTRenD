@@ -2,6 +2,7 @@
 #' Convert tree-ring data into CFS-TRenD format
 #'
 #' @param data  a list, first is input data in wide format; second is a flat sequence referring to the column indices of ring measurement variables
+#' @param usage 1: for submission data, 2: for cfstrend id structure to perform the analyse
 #' @param out.csv  output csv file (default is NULL, otherwise to specify the directory to output)
 
 
@@ -24,14 +25,14 @@
 #'
 
 #'
-CFS_format <- function (data, out.csv = NULL) {
+CFS_format <- function (data, usage, out.csv = NULL) {
   if (length(data) != 2) {
     print(length(data))
     stop("pls verify data is a list with 2 items, first is input data in wide format; second is a flat sequence referring to the column indices of ring measurement variables")
   }
   if (!(is.data.frame(data[[1]])| is.data.table(data[[1]]))) stop("the first item of data must be the complete data in wide format")
   if (is.list(data[[2]] | is.null(data[[2]]) | class(data[[2]]) != "integer" )) stop("the second item of data must be a flat sequence referring to the column indices of ring measurement variables")
-
+  if (!(usage %in% c(1,2))) stop ("usage must be set to 1 for data submission and 2 for acquiring cfstrend data structure")
 
       names.data.o <- names(data[[1]])
       # if (any(str_detect(names.data.o, "uid_radius.tmp"))) stop("please rename the column 'uid_radius.tmp'")
@@ -57,11 +58,16 @@ CFS_format <- function (data, out.csv = NULL) {
     # meta data
     dt.meta <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),data[[1]][,-data[[2]], with = FALSE])
     # tree ring
-    dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),radius_id = data[[1]]$radius_id, data[[1]][,data[[2]], with = FALSE])
+    # dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]),radius_id = data[[1]]$radius_id, data[[1]][,data[[2]], with = FALSE])
+    #
+    # dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp", "radius_id"))[!is.na(value)]
 
-    dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp", "radius_id"))[!is.na(value)]
-    setnames(dt.rwl, "value", "rw_mm")
-    dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
+
+
+    # dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp", "radius_id"))[!is.na(value)]
+    #
+    # setnames(dt.rwl, "value", "rw_mm")
+    # dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
 
 
   meta.all0 <- variables.cfstrend()
@@ -69,6 +75,7 @@ CFS_format <- function (data, out.csv = NULL) {
   setdiff(meta.all0$Variable, meta.all$Variable)
   # must-have meta variables for tr_1 to tr_6
   cols.musthave <-as.character( meta.all[Required == 1 & !(table %in% c("tr_7_ring_widths", "tr_8_uids_updated"))]$Variable)
+  if (usage == 2) cols.musthave <- c("project_name", "site_id", "latitude", "longitude", "tree_id", "species", "sample_id", "radius_id")
   add.Vars <- setdiff(cols.musthave, names(dt.meta))
 
 if (length(add.Vars) > 0) {
@@ -82,7 +89,12 @@ if (length(add.Vars) > 0) {
   }
 
   print("you have filled all the mandatory information")
+  dt.tr <- data.table(uid_radius.tmp = 1:nrow(data[[1]]), data[[1]][,"radius_id"], data[[1]][,data[[2]], with = FALSE])
 
+  dt.rwl <- melt(dt.tr, id.vars = c("uid_radius.tmp", "radius_id"))[!is.na(value)]
+
+  setnames(dt.rwl, "value", "rw_mm")
+  dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
   # for un-mandatory columns
 
   if (length(setdiff(meta.all[Required != 1]$Variable, names.data.o)) == 0) print("you have filled all the un-mandatory information") else{
@@ -149,8 +161,8 @@ if (length(add.Vars) > 0) {
     }
   # chk if species is included in species_nficode
   # species_nficode is the species list of tree source, and was saved as internal data
-  chk.spc2 <- setdiff(unique(dt.new$species), species_nficode$nfi_species_code)
-  if (length(chk.spc2)  > 0) stop(paste0("species: ", paste(chk.spc2, collapse = ", "), " not recognized, please verify..."))
+  # chk.spc2 <- setdiff(unique(dt.new$species), species_nficode$nfi_species_code)
+  # if (length(chk.spc2)  > 0) stop(paste0("species: ", paste(chk.spc2, collapse = ", "), " not recognized, please verify..."))
 
   dt.new[, uid_tree := .GRP, by = .(uid_project, uid_site, tree_id)]
 
@@ -159,6 +171,7 @@ if (length(add.Vars) > 0) {
   dt.new[, uid_sample := .GRP, by = .(uid_meas, sample_id)]
 
   dt.new[, uid_radius := .GRP, by = .(uid_sample, radius_id)]
+
 
   ys <- dt.rwl[, .(rw_ystart = min(year), rw_yend = max(year)), by = c("uid_radius.tmp")]
   setorder(dt.rwl, uid_radius.tmp, year)

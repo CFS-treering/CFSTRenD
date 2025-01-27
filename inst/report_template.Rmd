@@ -26,11 +26,12 @@ highlight: tango
 ```{r setup, include=FALSE}
 # This chunk sets global options to hide all R code from appearing in the output
 knitr::opts_chunk$set(echo = FALSE)
-# library(data.table)
-# library(CFSTRenD)
+library(data.table)
+library(CFSTRenD)
 library(gt)
 library(htmltools)
-library(ggplot2)
+# library(ggplot2)
+# library(sf)
 
 # read ring measurement
  # samples69.o <- fread(system.file("extdata", "samples69.csv", package = "CFSTRenD"))
@@ -48,16 +49,16 @@ library(ggplot2)
 # Introduction
 
 Project name: `r tr_long$tr_1_projects$project_name`
-There's `r length(unique(tr_long$tr_3_trees$species))` species in this dataset
+There's `r length(unique(tr_long$tr_3_trees$species))` species ( `r unique(tr_long$tr_3_trees$species)`) in this dataset. The count at each level:
 
-```{r}
+```{r, warning=FALSE}
 # library(gt)
 # library(htmltools)
 # library(data.table)
 library(patchwork)
 
-count_uid <- data.table(Nspecies = length(unique(tr_long$tr_3_trees$species)), Nprojects = nrow(tr_long$tr_1_projects), Nsites = nrow(tr_long$tr_2_sites), Ntree = nrow(tr_long$tr_3_trees),
-                        Nmeas = nrow(tr_long$tr_4_meas), Nsamples = nrow(tr_long$tr_5_samples), Nradiuses = nrow(tr_long$tr_6_radiuses))
+count_uid <- data.table(species = length(unique(tr_long$tr_3_trees$species)), projects = nrow(tr_long$tr_1_projects), sites = nrow(tr_long$tr_2_sites), tree = nrow(tr_long$tr_3_trees),
+                        meas = nrow(tr_long$tr_4_meas), samples = nrow(tr_long$tr_5_samples), radiuses = nrow(tr_long$tr_6_radiuses))
 gt_html <- gt(count_uid) %>% as_raw_html()
 gt_html
 ```
@@ -70,83 +71,9 @@ tr_7 <- merge(tr_w6, tr_long$tr_7_ring_widths, by ="uid_radius")
 for (i.spc in seq_along(spc.lst)){
 tr_6i <- tr_w6[species == spc.lst[i.spc]]
 tr_7i <- tr_7[species == spc.lst[i.spc]]
- # Create the bar plot
-  # p.Nrings <- ggplot(tr_6i[, c("rw_yend", "rw_ystart", "species")], aes(x = rw_yend - rw_ystart + 1)) + 
-  # geom_histogram(binwidth = 5, color = "black", fill = "green") +
-  # labs(title = "Histogram of series length", x = "series length", y = "Frequency") +
-  # theme_classic()
-if (nrow(tr_6i[!is.na(dbh_cm)]) > 0) p.dbh <- ggplot(tr_6i[!is.na(dbh_cm), .N, by = c("dbh_cm", "uid_tree", "species")], aes(x = dbh_cm)) + 
-  geom_histogram(binwidth = 5, color = "black", fill = "blue") +
-  labs(title = "dbh(cm)", x = "dbh(cm)", y = "Frequency") +
-  theme_classic() else p.dbh <- ggplot() + labs(title = "dbh frequency (no data)") +
-  theme_minimal() +  # Use a minimal theme as a starting point
-  theme(
-    panel.background = element_rect(fill = "transparent", color = NA),  # Transparent panel
-    plot.background = element_rect(fill = "transparent", color = NA)   # Transparent plot area
-  )
 
-if (nrow(tr_6i[!is.na(ht_tot_m)]) > 0)
-p.ht <- ggplot(tr_6i[!is.na(ht_tot_m), .N, by = c("ht_tot_m", "uid_tree", "species")], aes(x = ht_tot_m)) +  
-  geom_histogram(binwidth = 5, color = "black", fill = "yellow") +
-  labs(title = "height(m) ", x = "height(m)", y = "Frequency") +
-  theme_classic() else p.ht <- ggplot() + labs(title = "height frequency (no data)") +
-  theme_minimal() +  # Use a minimal theme as a starting point
-  theme(
-    panel.background = element_rect(fill = "transparent", color = NA),  # Transparent panel
-    plot.background = element_rect(fill = "transparent", color = NA)   # Transparent plot area
-  )
 
-# p.yr <- ggplot(tr_7i, aes(x = year)) +
-#   geom_bar(fill = "lightgrey", color = "lightblue") +
-#   labs(title = paste0("year frequency (max: ", nrow(tr_w6), ")"), x = "Year", y = "Count") +
-#   theme_minimal() 
-# 
-# p.rw <- ggplot(tr_7i, aes(x = rw_mm)) + 
-#   geom_histogram(binwidth = 1, color = "black", fill = "green") +
-#   labs(title = "rw_mm frequency", x = "ring width (mm)", y = "Frequency") +
-#   theme_classic()
-# map_bounds <- st_bbox(shp)
-tmp <- tr_6i[, .N, by = .(longitude, latitude)]
-pts <- tmp %>%
-    st_as_sf(coords = c("longitude", "latitude"), crs = "+proj=longlat +datum=WGS84") %>%
-    st_cast("POINT")
-
-p.loc <- ggplot() +
-  geom_sf(data = shp, fill = NA, color = "lightgrey", alpha = 0) + # Polygons
-  geom_sf(data = pts, color = "blue", size = 2) +          # Points
-  # annotate("text", 
-  #              x = map_bounds["xmin"] + 0.1 * (map_bounds["xmax"] - map_bounds["xmin"]), # Slightly inset from the left
-  #   y = map_bounds["ymax"] + 0.2 * (map_bounds["ymax"] - map_bounds["ymin"]), # Slightly above the top
-  # 
-  #          label = paste0("location"),
-  #          hjust = 0, vjust = 1, color = "black", size = 7) +   # Credits
-  coord_sf(expand = FALSE) +                                  # Add graticules with labels
-  theme_minimal() +
-  theme(
-    panel.grid.major = element_line(color = "grey", linetype = "dotted"), # Graticule styling
-    panel.grid.minor = element_blank(),                                   # No minor lines
-    axis.text = element_text(size = 7),                                 # Graticule label styling
-    axis.ticks = element_line(size = 0.5),                               
-    axis.title = element_blank()
-  )
-
-p.rw <- ggplot(tr_7i, aes(x = year, y = rw_mm)) + 
-  geom_point() +
-  labs(title = "ring width(mm) ", y = "ring width (mm)", x = "year") +
-  theme_classic()
-
-p.ispc<-  (p.loc | p.rw)/ (p.dbh | p.ht) +
-        plot_annotation(
-          title = paste0("Species: ", spc.lst[i.spc]) ,
-          tag_levels = 'a',
-          tag_suffix = ")") &
-        theme(
-          plot.title = element_text(face = "bold"),
-          plot.tag = element_text(face = "bold")
-       
-
-          # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
-          )
+p.ispc<- plots_ds(list(tr_6i, tr_7i))
     print(p.ispc)
     }
 ```

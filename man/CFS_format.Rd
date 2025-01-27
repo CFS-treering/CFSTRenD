@@ -4,10 +4,12 @@
 \alias{CFS_format}
 \title{Convert tree-ring data into CFS-TRenD format}
 \usage{
-CFS_format(data, out.csv = NULL)
+CFS_format(data, usage, out.csv = NULL)
 }
 \arguments{
 \item{data}{a list, first is input data in wide format; second is a flat sequence referring to the column indices of ring measurement variables}
+
+\item{usage}{1: for submission data, 2: for cfstrend id structure to perform the analyse}
 
 \item{out.csv}{output csv file (default is NULL, otherwise to specify the directory to output)}
 }

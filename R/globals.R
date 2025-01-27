@@ -28,7 +28,9 @@ utils::globalVariables(c(
 
   # gamm_main
   "ageC", "res.normalized", "res.normalized.LL",  "res.resp_normalized",
-  "lat_use", "lon_use", "start.event"
+  "lat_use", "lon_use", "start.event",
+  # cal.bai
+  "ba_cm2_t_1", "bai_cm2", "radius", "radius_prev", "med.rw"
   )
 )
 

@@ -30,9 +30,10 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 ```
-
+<br>
+<br>
 # Introduction
-
+<br>
 **CFSTRenD** R package aimed at streamlining the processing and analysis of tree-ring data. Key features include: 
 
      1. manipulation and summarization of tree-ring data; 
@@ -46,7 +47,7 @@ This vignette provides a precise guide to navigating key aspects of data process
    - clim69.csv: Annual winter frostdays (FFD) data corresponding to the same 20 sites included in samples69.csv.
 
 We start by loading the datasets:
-
+<br>
 ```{r setup}
 library(data.table)
 library(CFSTRenD)
@@ -56,21 +57,27 @@ library(CFSTRenD)
 clim69 <- fread(system.file("extdata", "clim69.csv", package = "CFSTRenD"))
 
 ```
-
+<br>
+<br>
+<br>
 
 # Functionality
-
+<br>
 ## 1. data manipulation and reporting
-
+<br>
 ### 1.1 Convert to CFS-TRenD format 
+<br>
 This is to generates formatted tables aligning with CFS-TRenD structure, ensuring compatibility for data submission and integration.
+<br>
 ```{r}
 
-samples69.trt <- CFS_format(data = list(samples69.o, 39:140), out.csv = NULL)
+samples69.trt <- CFS_format(data = list(samples69.o, 39:140), usage = 1, out.csv = NULL)
 
-rmarkdown::render(system.file( "report_template.Rmd", package = "CFSTRenD"))
+# generate_report (output_file = "c:/tmp/data_report.html")
 ```
 
+<br>
+<br>
 ** note that if any variable is missing in users' dataset, the system will prompt an alert to request users to fill it for mandatory information or fill it with NA for un-mandatory information under users' permission.**
 
 
@@ -84,11 +91,12 @@ dt.freq <- CFS_freq(samples69, uid_level = "uid_tree",  geo_resolution = c(1,1))
 plots_freq(dt.freq, out.species = "all", caption = "CFS-TRenD1.2 samples69", out.pdf= NULL )
 ```
 
-
+<br>
+<br>
 ## 2. data quality assessment
-
+<br>
 ### 2.1 compare on ring width measurement
-
+<br>
 This function is to compare the median of ring width measruement of one specific site with those of the nearby sites using k-NN method.
 
 
@@ -100,11 +108,12 @@ site.chk <- samples69[uid_site == 10 & species == "PSEUMEN",c("species", "uid_si
 dt.scale <- CFS_scale(site2chk = site.chk, ref_sites = samples69, N.nbs = 10, make.plot = list(TRUE, "CFS-TRenD1.2 samples69"))
 
 ```
-
+<br>
+<br>
 ### 2.2 quality assessment 
-
+<br>
 This is to assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements
-
+<br>
 
 ```{r, fig.width=7, fig.height=5, fig.align='center'}
 
@@ -120,7 +129,7 @@ samples69_long[, .N, by = .(SampleID, Year)][N>1]
 samples69_long[, RW_trt:= RawRing - shift(RawRing), by = SampleID]
 # run quality assessment procedure
 qa.trt.ccf <-CFS_qa(dt.input = samples69_long)
-
+print(qa.trt.ccf$dt.stats)
 # qa_code frequency
 qa.trt.ccf$dt.ccf[, .N, by = .(SampleID, qa_code)][, .N, by = .(qa_code)]
 # SampleID list
@@ -133,12 +142,17 @@ plots_qa(plot.lst = qa.trt.ccf$plot.lst, out.series = c("5"), caption = "CFS-TRe
 # plots_qa(qa.trt.ccf$plot.lst, out.series = "all", out.pdf = "c:/tmp/qa.pdf" )
 
 ```
+<br>
+<br>
 
 ## 3. detrending and climate-growth model 
-
+<br>
 
 ### 3.1 series-level detrending model
+<br>
+
 The series-level function gamm_radius() is used for the data with 1 series of tree ring measurement. It accounts for temporal autocorrelation by including tree identity as random effects and a first-order autoregressive (AR1) correlation structures.
+<br>
 ```{r , fig.width=7, fig.height=5, fig.align='center'}
 
 series.i <- samples69.trt$tr_all_long$tr_7_ring_widths[uid_radius == 1]
@@ -156,11 +170,16 @@ acf(m.radius$pred$res.log_resp_normalized, plot = TRUE, main = "standardized res
 par(mfrow = c(1, 1))
 
 ```
-
+<br>
+<br>
 ### 3.2 site-level climate-growth model
-The site-level function gamm_site() is used for the dataset within one-site with multiple series of tree ring measurement. It accounts for within-site variability and temporal autocorrelation by including tree identity as random effects and a first-order autoregressive (AR1) correlation structures.
+<br>
 
+The site-level function gamm_site() is used for the dataset within one-site with multiple series of tree ring measurement. It accounts for within-site variability and temporal autocorrelation by including tree identity as random effects and a first-order autoregressive (AR1) correlation structures.
+<br>
 #### prepare data for growth-climate model
+<br>
+
 ```{r}
 
 samples69_clim <- merge(samples69.trt$tr_all_wide[, c("uid_site", "site_id","latitude", "longitude",  "species", "uid_tree", "uid_radius")], samples69.trt$tr_all_long$tr_7_ring_widths, by = "uid_radius")
@@ -183,8 +202,10 @@ samples69_clim[, c("radius", "radius_prev") := NULL]
 
 samples69_clim <- merge(samples69_clim, clim69, by = c("site_id", "year"))
 ```
-
+<br>
+<br>
 ####  site-level growth-climate model
+<br>
 
 ```{r, fig.width=7, fig.height=5, fig.align='center'}
 
@@ -209,7 +230,10 @@ acf(m.site$pred$res.log_resp_normalized, plot = TRUE, main = "standardized resid
 # Reset layout
 par(mfrow = c(1, 1))
 ```
+<br>
+<br>
 ### 3.3 spatial growth-climate model (multiple sites)
+<br>
 
 The gamm_spatial() function handles moderate geographic coverage by accounting for among-site and within-site variability with random effects for site and tree identities, respectively, and temporal autocorrelation using an AR1 structure. If spatial autocorrelation persists, the model refits automatically with a smooth term for latitude and longitude using the Spatial Over-Smooth ("sos") basis.
 
@@ -234,10 +258,12 @@ acf(m.sp$pred$res.log_resp_normalized, plot = TRUE, main = "standardized residua
 # par(mfrow = c(1, 1))
 
 ```
-
+<br>
+<br>
 ### 3.4 spatial growth-climate model (very large dataset and geographical coverage)
 
 The bam_spatial() function addresses the computational challenges of analyzing large datasets with extensive geographic coverage, where GAMMs become a limitation.  It combines the efficiency of the bam() function from the mgcv package with post-hoc residualization methods from the itsadug package to manage temporal autocorrelation. The function incorporates site and tree identities as random effects and includes an AR1 structure for temporal autocorrelation. When spatial autocorrelation persists, it refits the model with a thin-plate ("tp") basis for latitude and longitude to account for spatial dependence.
+<br>
 
 ```{r, fig.width=7, fig.height=5, fig.align='center'}
 
@@ -260,12 +286,16 @@ acf(m.spp$pred[!is.na(res.log_resp_normalized)]$res.log_resp_normalized, plot = 
 # par(mfrow = c(1, 1))
 
 ```
+<br>
+<br>
+<br>
+<br>
 ## 4 model selection
-
+<br>
 The modelling framework of section 3 can be served as model selection tool if users specify multiple candidate models through m.candiates argument. Each candidate model is initially fitted using the maximum likelihood (ML) method to ensure a fair comparison based on the Akaike Information Criterion (AIC). Then it is refitted using the restricted maximum likelihood (REML) method to obtain unbiased estimates of model parameters . 
 
 Below we take site-level model as an example. The result is exactly the same as those of section 3.2
-
+<br>
 ```{r, fig.width=7, fig.height=5, fig.align='center'}
 
 # samples69_clim[, uid_tree.fac:= as.factor(as.character(uid_tree))]
@@ -293,3 +323,8 @@ acf(m.site$pred$res.log_resp_normalized, plot = TRUE, main = "standardized resid
 
 # Reset layout
 par(mfrow = c(1, 1))
+```
+<br>
+<br>
+## 5 reporting
+<br>

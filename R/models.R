@@ -178,9 +178,10 @@ bam_spatial <- function(data, resp_scale = "log", m.candidates){
 gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
   if (length(m.candidates) == 0) stop("must assign the equation(s) to m.candidates")
   if (resp_scale == "log") {
-
+# if in log-scale, use gaussian distribution
     famil = gaussian("identity")
   }else {
+    # in orginal scale, use Gamma with log link function
     famil = Gamma("log")
     if (resp_scale == "hybrid") {
 
@@ -191,6 +192,7 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
   if (length(m.candidates) > 1){
     for (i in 1:length(m.candidates)){
       formul <- as.formula(m.candidates[i])
+      # in log-scale, log-transfrom response variable
       if (resp_scale == "log") formul <- update(formul, log(.) ~ .)
       if (m.option == 1){
 
@@ -324,7 +326,7 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
   }
 
     # further for spatial effect
-    if (m.option >= 3){
+    if (m.option >= 3 & all(c("latitude", "longitude") %in% names(data))){
 
       data[, c("lon_use", "lat_use") := list(round(longitude,1), round(latitude,1) )]
 
@@ -408,7 +410,7 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
   tmp.y <- data.table(data, pred.terms, fit.y)
   tmp.y$res.resp <- residuals(m.sel$gam, type = "response")
   tmp.y$res.resp_normalized <- residuals(m.sel$lme, type = "normalized")
-
+  if ("res.normalized" %in% names(tmp.y)) tmp.y$res.normalized <- NULL
   # if (resp_scale == "log") setnames(tmp.y, c("fit.resp", "se.fit.resp", "res.resp", "res.resp_normalized"),
   #                                   c("fit.log_resp", "se.fit.log_resp", "res.log_resp", "res.log_resp_normalized"))
 
@@ -445,9 +447,58 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
   # }
 
   return.lst <- list(model = m.sel, fitting = aic.reml, ptable = ptable, stable = stable, pred = tmp.y)
-  if (m.option >= 3) return.lst$moranI <- moranI
+  if (m.option >= 3 & exists("moranI")) return.lst$moranI <- moranI
   if (length(m.candidates) > 1)  return.lst$fitting_ML <- aic.all
 
   return(return.lst)
 }
 
+
+
+#' calculate bai
+
+#' @description
+#' calculate basal area (cm2) and basal area increment (cm2)
+#'
+#'
+#' @param dt.long data in long format containing at least 3 columns: id, year, rw
+#' @param id column name of series id
+#' @param rw column name of ring width measurement which is in mm
+#'
+#'
+#' @import data.table
+#'
+#'
+#' @return add 3 columns to the original input data, ageC for cambial age, ba_cm2_t_1 for basal area of the previous year in cm2, and bai_cm2 for annual basal area increment in cm2
+#'
+#' @export cal.bai
+
+
+cal.bai <- function(dt.long, id , rw){
+  setDT(dt.long)
+  med.rw <- median(as.numeric(dt.long[[rw]]), na.rm = TRUE)
+  # cat("please assure the unit of ", rw, " is mm")
+
+  if (!all(c(id, "year", rw) %in% names(dt.long))) stop (paste0("at least one of the variables ", id, "year", rw, "not exists, please verify..."))
+
+  if (nrow(dt.long[, .N, by = eval(c(id, "year"))][N>1]) > 0) stop (paste0(id, "-year is not a unique key, please verify..."))
+
+  if (med.rw > 10) print(paste0("median of rw ", med.rw, " seems too big, assure it's in mm"))
+  if (med.rw < 1) print(paste0("median of rw ", med.rw, " seems too small, assure it's in mm"))
+
+  setorderv(dt.long, c(id, "year"))
+
+  dt.long[, `:=`(ageC = seq_len(.N),
+                 radius = cumsum(eval(parse(text = rw))),  # Cumulative radius (assumes RW is added each year)
+                 radius_prev = shift(cumsum(eval(parse(text = rw))), fill = 0)), by = eval(id)]  # Previous radius (shifted)
+
+  # Compute previous BA in cm2
+  dt.long[, ba_cm2_t_1 := pi * (radius_prev^2)/100]
+
+  dt.long[, bai_cm2 := pi * (radius^2 - radius_prev^2)/100]
+  dt.long[bai_cm2 < 0]
+
+  # Drop the radius columns if not needed
+  dt.long[, c("radius", "radius_prev") := NULL]
+  return(dt.long)
+}

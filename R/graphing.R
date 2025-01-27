@@ -152,3 +152,189 @@ plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL
   if (!is.null(out.pdf)) dev.off()
 }
 
+
+#' plot data summary and location
+#' @description
+#' This function plots the site location and frequency distribution of series length and ring width measurement per species. It's used for generating the data report
+#'
+#' @param data a list of 2 tables : 1st is meta data with 1 species only ; 2nd is the ring width measurement in long-format
+
+
+#' @import patchwork
+#' @import ggplot2
+#' @import sf
+
+#' @export plots_ds
+
+plots_ds <- function(data){
+  dt.tr <- data[[1]]
+  dt.rw <- data[[2]]
+  spc <- unique(dt.tr$species)
+  # if (nrow(dt.tr[!is.na(dbh_cm)]) > 0)
+  #   p.dbh <- ggplot(dt.tr[!is.na(dbh_cm), .N, by = c("dbh_cm", "uid_tree", "species")], aes(x = dbh_cm)) +
+  #   geom_histogram(binwidth = 5, color = "black", fill = "blue") +
+  #   labs(title = "dbh (cm)", x = "dbh (cm)", y = "Frequency") +
+  #   theme_classic() else p.dbh <- ggplot() + labs(title = "dbh frequency (no data)") +
+  #   theme_minimal() +  # Use a minimal theme as a starting point
+  #   theme(
+  #     panel.background = element_rect(fill = "transparent", color = NA),  # Transparent panel
+  #     plot.background = element_rect(fill = "transparent", color = NA)   # Transparent plot area
+  #   )
+  #
+  # if (nrow(dt.tr[!is.na(ht_tot_m)]) > 0)
+  #   p.ht <- ggplot(dt.tr[!is.na(ht_tot_m), .N, by = c("ht_tot_m", "uid_tree", "species")], aes(x = ht_tot_m)) +
+  #   geom_histogram(binwidth = 5, color = "black", fill = "yellow") +
+  #   labs(title = "height (m) ", x = "height (m)", y = "Frequency") +
+  #   theme_classic() else p.ht <- ggplot() + labs(title = "height frequency (no data)") +
+  #   theme_minimal() +  # Use a minimal theme as a starting point
+  #   theme(
+  #     panel.background = element_rect(fill = "transparent", color = NA),  # Transparent panel
+  #     plot.background = element_rect(fill = "transparent", color = NA)   # Transparent plot area
+  #   )
+
+  # p.yr <- ggplot(dt.rw, aes(x = year)) +
+  #   geom_bar(fill = "lightgrey", color = "lightblue") +
+  #   labs(title = paste0("year frequency (max: ", nrow(tr_w6), ")"), x = "Year", y = "") +
+  #   theme_minimal()
+  #
+  p.rw_hist <- ggplot(dt.rw, aes(x = rw_mm)) +
+    geom_histogram(binwidth = 1, color = "black", fill =  "lightgreen") +
+    labs(title = "ring width", x = "ring width (mm)", y = "Frequency") +
+    theme_classic()
+  # `map_bounds` <- st_bbox(shp)
+  p.age <- ggplot(dt.rw, aes(x = rw_yend - rw_ystart + 1)) +
+    geom_bar(fill = "lightblue", color = "lightblue") +
+    labs(title = paste0("series length"), x = "series length", y = "Frequency") +
+    theme_minimal()
+
+
+    tmp <- dt.tr[, .N, by = .(longitude, latitude)]
+  pts <- tmp %>%
+    st_as_sf(coords = c("longitude", "latitude"), crs = "+proj=longlat +datum=WGS84") %>%
+    st_cast("POINT")
+
+  p.loc <- ggplot() +
+    geom_sf(data = shp, fill = NA, color = "lightgrey", alpha = 0) + # Polygons
+    geom_sf(data = pts, color = "blue", size = 2) +          # Points
+    labs(title = "site location ") +
+    # annotate("text",
+    #              x = map_bounds["xmin"] + 0.1 * (map_bounds["xmax"] - map_bounds["xmin"]), # Slightly inset from the left
+    #   y = map_bounds["ymax"] + 0.2 * (map_bounds["ymax"] - map_bounds["ymin"]), # Slightly above the top
+    #
+    #          label = paste0("location"),
+    #          hjust = 0, vjust = 1, color = "black", size = 7) +   # Credits
+    coord_sf(expand = FALSE) +                                  # Add graticules with labels
+    theme_minimal() +
+    theme(
+      panel.grid.major = element_line(color = "grey", linetype = "dotted"), # Graticule styling
+      panel.grid.minor = element_blank(),                                   # No minor lines
+      axis.text = element_text(size = 7),                                 # Graticule label styling
+      axis.ticks = element_line(size = 0.5),
+      axis.title = element_blank()
+    )
+
+  p.rw <- ggplot(dt.rw, aes(x = year, y = rw_mm)) +
+    geom_point(color = "lightgrey") +
+    labs(title = "ring width(mm) ", y = "ring width (mm)", x = "year") +
+    theme_classic()
+
+  p.ispc<-  (p.loc | p.rw)/ (p.age | p.rw_hist) +
+    plot_annotation(
+      title = paste0("Species: ", spc) ,
+      tag_levels = 'a',
+      tag_suffix = ")") &
+    theme(
+      plot.title = element_text(face = "bold"),
+      plot.tag = element_text(face = "bold")
+
+
+      # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
+    )
+  return(p.ispc)
+}
+
+
+#' plot multiple series by wrap_facet, and put them in a list
+#' @description
+#' This function plots dynamic xyplot per category using wrap_facet. each facet contains nrow*ncol plots. It's used for generating the data report
+#'
+#' @param data a data table including all the necessary columns in varcols
+#' @param varcols a list containing 3 column names for x, y and facet category.
+#' @param xylabels a list containing the labels for x-axis and y-axis
+#' @param nrow number of plots per row
+#' @param ncol number of plots per col
+
+
+#' @import ggforce
+#' @import ggplot2
+
+
+#' @export plots_facet
+
+plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
+  # Calculate the total number of pages
+  # print(paste0(nrow, " ", ncol))
+  total_pages <- ceiling(length(unique(data[[varcols[[3]]]])) / (nrow*ncol))
+  # print(total_pages)
+
+  # Generate plots for each page
+  plot_list <- lapply(1:total_pages, function(page) {
+    ggplot(data, aes(x = .data[[varcols[[1]]]], y = .data[[varcols[[2]]]])) +
+      geom_point(color = "lightgrey") +
+      facet_wrap_paginate(
+        ~.data[[varcols[[3]]]],
+        ncol = ncol,
+        nrow = nrow,
+        page = page
+      ) +
+      scale_x_continuous(labels = scales::number_format(scale = 1)) +  # Ensure continuous year labels
+      labs(x = xylabels[[1]], y = xylabels[[2]]) +
+      theme_minimal() +
+      theme(legend.position = "bottom")
+  })
+  # 2 per page
+  if ((floor(total_pages/2))*2 != total_pages) plot_list[[total_pages+1]] <- ggplot() +
+    theme(
+      panel.background = element_blank(),  # No background
+      plot.background = element_blank(),   # No plot area background
+      axis.ticks = element_blank(),        # No axis ticks
+      axis.text = element_blank(),         # No axis text
+      axis.title = element_blank()         # No axis titles
+    )
+
+  return(plot_list)
+}
+
+
+#' Generate a data/model Report
+#'
+#' This function generates an HTML data report using an R Markdown template.
+#' @param input a list, the first is either "data" or "model", the second is the r object, either a data table or a model object
+#' @param usage for data report, 1 for data submission, hence the complete report; 2 for modelling use, simplified report. It has no effect on model report.
+#' @param output_file A string specifying the name of the output HTML file.
+#'
+#' @return An HTML file containing the data report.
+#' @export generate_report
+
+generate_report <- function(input, usage = 1, output_file = NULL) {
+  if (!input[[1]] %in% c("data", "model")) stop("the first item needs to be data or model")
+  robj <- input[[2]]
+  # Path to the R Markdown template
+  rmd_file <- system.file("rmd", paste0(input[[1]],"_report_template.Rmd"), package = "CFSTRenD")
+
+                          # Check if the template exists
+                          if (rmd_file == "") {
+                            stop("Template not found! Ensure 'data_report_template.Rmd' is in inst/rmd/ directory.")
+                          }
+
+                          # Render the report
+                          if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(rmd_file)) else
+
+                            rmarkdown::render(
+                              input = rmd_file,
+                              output_file = output_file,
+                              # params = list(dataset = data),
+                              envir = new.env(parent = globalenv()) # Isolate environment
+                            )
+}
+
