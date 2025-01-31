@@ -7,6 +7,12 @@ output:
   html_document:
   theme: flatly
 highlight: tango
+
+params:
+  robj: NULL
+  usage: NULL
+
+
 # toc: true
 # toc_depth: 4            # Define the depth of the TOC (increase as needed)
 # toc_float:
@@ -39,7 +45,8 @@ library(htmltools)
  #  samples69.trt <- CFS_format(data = list(samples69.o, 39:140), usage = 1, out.csv = NULL)
  #  
   # usage <- 2; robj <- samples69.trt
-  
+robj <- params$robj
+usage <- params$usage
   tr_long <- robj$tr_all_long
  samples69_long <- merge(robj$tr_all_wide[, c("uid_site", "site_id", "species", "uid_tree", "uid_sample", "uid_radius")], 
    tr_long$tr_7_ring_widths, by = "uid_radius")

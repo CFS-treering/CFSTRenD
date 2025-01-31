@@ -1,24 +1,63 @@
 ---
 title: model fitting report
 output: html_document
+params:
+  robj: NULL
+  usage: NULL
+
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+robj <-params$robj
+usage <- params$usage
 ```
 
 
 
-model summary
+### model summary
 
 ```{r, echo=FALSE, warning=FALSE, fig.width=10, fig.height=5, fig.align='left' }
-print(summary(robj$model$gam))
+
+if ("gamm" %in% class(robj$model)) m.gam <- robj$model$gam 
+if ("bam" %in% class(robj$model) | "gam" %in% class(robj$model)) m.gam <- robj$model
+# 
+# m.name <- setdiff(
+#   ls(envir = .GlobalEnv)[sapply(ls(envir = .GlobalEnv), function(x) identical(get(x), robj))],
+#   "robj"
+# )
+
+if (!is.null(robj$fitting_ML)) knitr::kable(robj$fitting_ML, caption = "Fitting Results with ML method")
+
+# cat(paste("<br>#####", m.name, " model summary", "<br>"))
+ # cat(paste("<br>#####", " model summary", "<br>"))
+print(summary(m.gam))
 ```
 
 <br>
 <br>
-some plots on fitting
+
+#### fitting on terms
+
+```{r, echo=FALSE, warning=FALSE, fig.width=10, fig.height=5, fig.align='left' }
+#
+
+# ggplot(robj$pred, aes(x = ageC, y = fit.s.ageC.)) +
+#   geom_line(color = "blue", size = 1) +  # Main fitted line
+#   geom_ribbon(aes(ymin = fit.s.ageC. - 1.96*se.fit.s.ageC.,
+#                   ymax = fit.s.ageC. + 1.96*se.fit.s.ageC.),
+#               fill = "blue", alpha = 0.2) +  # Confidence interval ribbon
+#   labs(
+#        x = "ageC",
+#        y = "Fitted Value (fit.s.ageC.)") +
+#   theme_minimal()
+par(mfrow = c(1, 2))
+mgcv::plot.gam(m.gam)
+```
 <br>
+
+#### fitting diagnostics
+
 ```{r, echo=FALSE, warning=FALSE, fig.width=10, fig.height=5, fig.align='left' }
 # some plots regarding fitting
 library(patchwork)
@@ -33,12 +72,12 @@ library(ggplot2)
 # }else xlog = ""
 # if (str_sub(vresp, 1,4) == "log_") xlog = "log_" else xlog = ""
 vfit <- names(robj$pred)[str_detect(names(robj$pred), "^fit.*resp$")]
-
-vresp <- as.character(formula(robj$model$gam)[[2]])
+vresp <- as.character(formula(m.gam)[[2]])
 vres_norm <- names(robj$pred)[str_detect(names(robj$pred), "^res.*_normalized$")]
 vres_raw <- names(robj$pred)[str_detect(names(robj$pred), "^res.*resp$")]
+
 if (length(vresp) == 2){
-p1<- ggplot(robj$pred, aes(x = get(vfit), y = log(get(vresp[[2]])))) + geom_point() +
+p1<- ggplot(robj$pred, aes(x = .data[[vfit]], y = log(.data[[vresp[[2]]]]))) + geom_point() +
   geom_abline(slope = 1, intercept = 0, linewidth = 2 , color = "red", linetype = "dashed") +
   theme_minimal() +
   labs(title = "Observed vs. fitted",
@@ -49,7 +88,7 @@ p1<- ggplot(robj$pred, aes(x = get(vfit), y = log(get(vresp[[2]])))) + geom_poin
 
 
 }else{
-         p1<- ggplot(robj$pred, aes(x = get(vfit), y = get(vresp))) + geom_point() +
+          p1<- ggplot(robj$pred, aes(x = .data[[vfit]], y = .data[[vresp]])) + geom_point() +
   geom_abline(slope = 1, intercept = 0, linewidth = 2 , color = "red", linetype = "dashed") +
   theme_minimal() +
   labs(title = "Observed vs. fitted",
@@ -78,31 +117,18 @@ p1<- ggplot(robj$pred, aes(x = get(vfit), y = log(get(vresp[[2]])))) + geom_poin
 
 
 # Create QQ plot
-p2 <-ggplot(robj$pred, aes(sample = get(vres_norm))) +
+p2 <-ggplot(robj$pred, aes(sample = .data[[vres_norm]])) +
   stat_qq() +                     # Add QQ points
   stat_qq_line(color = "red") +   # Add reference line
-  labs(title = "QQ Plot of normalized residuals", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  labs(title = "QQ Plot of standardized residuals", x = "Theoretical Quantiles", y = "Sample Quantiles") +
   theme_minimal()
 
 
 p1|p2
 ```
-```{r, echo=FALSE, warning=FALSE, fig.width=10, fig.height=5, fig.align='left' }
-#
 
-# ggplot(robj$pred, aes(x = ageC, y = fit.s.ageC.)) +
-#   geom_line(color = "blue", size = 1) +  # Main fitted line
-#   geom_ribbon(aes(ymin = fit.s.ageC. - 1.96*se.fit.s.ageC.,
-#                   ymax = fit.s.ageC. + 1.96*se.fit.s.ageC.),
-#               fill = "blue", alpha = 0.2) +  # Confidence interval ribbon
-#   labs(
-#        x = "ageC",
-#        y = "Fitted Value (fit.s.ageC.)") +
-#   theme_minimal()
-par(mfrow = c(1, 2))
-mgcv::plot.gam(robj$model$gam)
-```
 ```{r, echo=FALSE, warning=FALSE, fig.width=10, fig.height=5, fig.align='left' }
+# vfit <- names(robj$pred)[str_detect(names(robj$pred), "^fit.*resp$")]
 vres <- names(robj$pred)[str_detect(names(robj$pred), "^res.*resp$")]
 p.res<- ggplot(robj$pred, aes(x = get(vfit), y = get(vres_raw))) + geom_point() +
   geom_abline(slope = 0, intercept = 0, linewidth = 2 , color = "red", linetype = "dashed") +
@@ -124,6 +150,6 @@ p.res|p.res_norm
 par(mfrow = c(1, 2))
 
 acf(robj$pred[[vres]], plot = TRUE, main = "raw residuals")
-acf(robj$pred[[vres_norm]], plot = TRUE, main = "standardized residuals")
+acf(robj$pred[[vres_norm]], plot = TRUE, main = "standardized residuals", na.action = na.pass)
 
 ```

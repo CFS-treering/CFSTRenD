@@ -309,18 +309,23 @@ plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
 #' Generate a data/model Report
 #'
 #' This function generates an HTML data report using an R Markdown template.
-#' @param input a list, the first is either "data" or "model", the second is the r object, either a data table or a model object
+#' @param robj an r object, either a list of data tables running from CFS_format()  or a list running from gamm_series, gamm_site, gamm_spatial or bam_spatial
 #' @param usage for data report, 1 for data submission, hence the complete report; 2 for modelling use, simplified report. It has no effect on model report.
 #' @param output_file A string specifying the name of the output HTML file.
 #'
 #' @return An HTML file containing the data report.
 #' @export generate_report
 
-generate_report <- function(input, usage = 1, output_file = NULL) {
-  if (!input[[1]] %in% c("data", "model")) stop("the first item needs to be data or model")
-  robj <- input[[2]]
+generate_report <- function(robj, usage = 1, output_file = NULL) {
+  # if (!input[[1]] %in% c("data", "model")) stop("the first item needs to be data or model")
+  # robj <- input[[2]]
+  if ( "data.frame" %in% class(robj$tr_all_wide) | "data.table" %in% class(robj$tr_all_wide)) type.templt <- "data" else {
+    if ( "list" %in% class(robj) & !is.null(robj$model)) type.templt <- "model"
+  }
   # Path to the R Markdown template
-  rmd_file <- system.file("rmd", paste0(input[[1]],"_report_template.Rmd"), package = "CFSTRenD")
+  rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
+  # rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst/rmd", paste0(type.templt,"_report_template.Rmd"))
+
 
                           # Check if the template exists
                           if (rmd_file == "") {
@@ -328,13 +333,35 @@ generate_report <- function(input, usage = 1, output_file = NULL) {
                           }
 
                           # Render the report
-                          if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(rmd_file)) else
+                          if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(input = rmd_file,
+                                                                                                      params = list(robj = robj, usage = usage))) else
 
                             rmarkdown::render(
                               input = rmd_file,
                               output_file = output_file,
-                              # params = list(dataset = data),
+                              params = list(robj = robj, usage = usage),
                               envir = new.env(parent = globalenv()) # Isolate environment
                             )
 }
 
+
+# generate_vignette <- function(output_file = NULL) {
+#
+#   # Path to the R Markdown template
+#   # rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
+#   rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst", paste0("vignette_CFSTRenD.Rmd"))
+#
+#   # Check if the template exists
+#   if (rmd_file == "") {
+#     stop("Template not found! Ensure 'data_report_template.Rmd' is in inst/rmd/ directory.")
+#   }
+#
+#   # Render the report
+#   if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(rmd_file)) else
+#
+#     rmarkdown::render(
+#       input = rmd_file,
+#       output_file = output_file,
+#       envir = new.env(parent = globalenv()) # Isolate environment
+#     )
+# }

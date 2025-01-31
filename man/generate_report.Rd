@@ -4,10 +4,10 @@
 \alias{generate_report}
 \title{Generate a data/model Report}
 \usage{
-generate_report(input, usage = 1, output_file = NULL)
+generate_report(robj, usage = 1, output_file = NULL)
 }
 \arguments{
-\item{input}{a list, the first is either "data" or "model", the second is the r object, either a data table or a model object}
+\item{robj}{an r object, either a list of data tables running from CFS_format()  or a list running from gamm_series, gamm_site, gamm_spatial or bam_spatial}
 
 \item{usage}{for data report, 1 for data submission, hence the complete report; 2 for modelling use, simplified report. It has no effect on model report.}
 
