@@ -154,7 +154,7 @@ for (i.spc in seq_along(spc.lst)){
 tr_6i <- tr_w6[species == spc.lst[i.spc]]
 tr_7i <- tr_7[species == spc.lst[i.spc]]
 dt.radii.spc <- dt.radii[species == spc.lst[i.spc]]
-dt.summary.0 <- tr_w6[, .(lat = paste0(round(min(latitude),1), " ", round(max(latitude),1)), 
+dt.summary.0 <- tr_6i[, .(lat = paste0(round(min(latitude),1), " ", round(max(latitude),1)), 
                               lon = paste0(round(min(longitude),1), " ", round(max(longitude),1))), by = .(species)]
 
 setnames(dt.summary.0, c("lat", "lon"), c("Latitude range", "Longitude range"))
@@ -260,7 +260,7 @@ dt.radii.spc <- dt.radii[species == spc.lst[i.spc]]
 # plotting 
 tr_7i <- samples69_long[species == spc.lst[i.spc]]
 
-plot_list <- plots_facet(data = tr_7i, varcols = c("Year", "RawRing", "site_id"), xylabels = c("Year", "Ring Width (mm)"), nrow = 2, ncol = 2)
+plot_list <- plots_facet(data = tr_7i, varcols = c("Year", "RawRing", "site_id"), xylabels = c("Year", "Ring Width (mm)"), nrow = 1, ncol = 2)
 
 library(patchwork)
 
@@ -275,52 +275,110 @@ print(plot_list[[(page-1)*2 +1]] | plot_list[[endpage]]   +
   
 }
 
-if (usage != 1){
-  tr_7i[, year:= Year]
-tr_7i <- cal.bai(tr_7i, "uid_tree" , "RawRing")
-plot_list <- plots_facet(data = tr_7i, varcols = c("year", "bai_cm2", "site_id"), xylabels = c("Year", "basal area increment (cm2)"), nrow = 2, ncol = 2)
+# if (usage != 1){
+#   tr_7i[, year:= Year]
+# tr_7i <- cal.bai(tr_7i, "uid_tree" , "RawRing")
+# plot_list <- plots_facet(data = tr_7i, varcols = c("year", "bai_cm2", "site_id"), xylabels = c("Year", "basal area increment (cm2)"), nrow = 2, ncol = 2)
+# # 
+# #  empty_plot <- ggplot() +
+# #   theme(
+# #     panel.background = element_blank(),  # No background
+# #     plot.background = element_blank(),   # No plot area background
+# #     axis.ticks = element_blank(),        # No axis ticks
+# #     axis.text = element_blank(),         # No axis text
+# #     axis.title = element_blank()         # No axis titles
+# #   )
+# # 
+# # # print(empty_plot)
+# # 
+# # if ((floor(total_pages/2))*2 != total_pages) plot_list[[total_pages+1]] <- empty_plot
+# library(patchwork)
+# cat(paste0("<br><br>"))
+# cat(paste(" \n\n\n\n"))
 # 
-#  empty_plot <- ggplot() +
-#   theme(
-#     panel.background = element_blank(),  # No background
-#     plot.background = element_blank(),   # No plot area background
-#     axis.ticks = element_blank(),        # No axis ticks
-#     axis.text = element_blank(),         # No axis text
-#     axis.title = element_blank()         # No axis titles
-#   )
 # 
-# # print(empty_plot)
+# cat(paste("#####", spc.lst[i.spc], "on basal area increment", "\n\n"))
 # 
-# if ((floor(total_pages/2))*2 != total_pages) plot_list[[total_pages+1]] <- empty_plot
-library(patchwork)
-cat(paste0("<br><br>"))
-cat(paste(" \n\n\n\n"))
-
-
-cat(paste("#####", spc.lst[i.spc], "on basal area increment", "\n\n"))
-
-# normal distribution
+# # normal distribution
+# # p.bai <- ggplot(tr_7i, aes(x = bai_cm2)) +
+# #   geom_histogram(aes(y = after_stat(density)),  # Use density for scaling
+# #                  binwidth = 1, color = "black", fill = "#A9D08E") +
+# #   stat_function(fun = dnorm, args = list(
+# #     mean = mean(tr_7i$bai_cm2, na.rm = TRUE),
+# #     sd = sd(tr_7i$bai_cm2, na.rm = TRUE)
+# #     ),
+# #                 color = "red", linetype = "dashed", size = 1) +
+# #   labs(title = "bai (cm2)",
+# #        x = "bai (cm2)",
+# #        y = "Density") +
+# #   theme_classic()
+# 
+# # Fit gamma parameters to your data
+# gamma_params <- MASS::fitdistr(tr_7i$bai_cm2[tr_7i$bai_cm2 > 0], "gamma")
+# 
+# shape <- gamma_params$estimate["shape"]
+# rate <- gamma_params$estimate["rate"]
+# 
+# # Create the plot with gamma distribution
 # p.bai <- ggplot(tr_7i, aes(x = bai_cm2)) +
 #   geom_histogram(aes(y = after_stat(density)),  # Use density for scaling
 #                  binwidth = 1, color = "black", fill = "#A9D08E") +
+#   stat_function(fun = dgamma, args = list(
+#     shape = shape,
+#     rate = rate
+#     ), color = "red", size = 1) +  # Add gamma function with customizations
+#   labs(
+#     title = "Histogram on BAI with Gamma Distribution Fit",
+#     x = "BAI (cm²)",
+#     y = "Density"
+#   ) +
+#   theme_minimal()
+# 
+# 
+# p.log_bai <- ggplot(tr_7i, aes(x = log(bai_cm2))) +
+#   geom_histogram(aes(y = after_stat(density)),  # Use density for scaling
+#                  binwidth = 1, color = "black", fill = "#A9D08E") +
 #   stat_function(fun = dnorm, args = list(
-#     mean = mean(tr_7i$bai_cm2, na.rm = TRUE),
-#     sd = sd(tr_7i$bai_cm2, na.rm = TRUE)
+#     mean = mean(log(tr_7i$bai_cm2), na.rm = TRUE),
+#     sd = sd(log(tr_7i$bai_cm2), na.rm = TRUE)
 #     ),
 #                 color = "red", linetype = "dashed", size = 1) +
-#   labs(title = "bai (cm2)",
-#        x = "bai (cm2)",
+#   labs(title = "Histogram on log-BAI with Normal Distribution Fit",
+#        x = "log-bai",
 #        y = "Density") +
 #   theme_classic()
+# 
+# 
+# # p.bai|p.log_bai
+# 
+# for (page in 1: ceiling(length(plot_list)/2)){
+#   endpage <-min (length(plot_list), (page-1)*2 +2 )
+# print(plot_list[[(page-1)*2 +1]] | plot_list[[endpage]]   +
+#   plot_annotation() &
+#   theme(plot.margin = margin(5, 5, 5, 5)))
+#   
+# }
+# 
+# 
+# cat(paste0("<br><br>"))
+# cat("\n\n\n\n")
+# 
+# cat(paste("#####", spc.lst[i.spc], "on bai and log(bai)", "\n\n"))
+# print(p.bai|p.log_bai  + plot_layout(widths = c(1,1)))
+# }
 
-# Fit gamma parameters to your data
-gamma_params <- MASS::fitdistr(tr_7i$bai_cm2[tr_7i$bai_cm2 > 0], "gamma")
+}
+if (usage != 1){
+  
+  # Fit gamma parameters to your data
+  tr_7 <- cal.bai(tr_7, "uid_tree" , "rw_mm")
+gamma_params <- MASS::fitdistr(tr_7$bai_cm2[tr_7$bai_cm2 > 0], "gamma")
 
 shape <- gamma_params$estimate["shape"]
 rate <- gamma_params$estimate["rate"]
 
 # Create the plot with gamma distribution
-p.bai <- ggplot(tr_7i, aes(x = bai_cm2)) +
+p.bai <- ggplot(tr_7, aes(x = bai_cm2)) +
   geom_histogram(aes(y = after_stat(density)),  # Use density for scaling
                  binwidth = 1, color = "black", fill = "#A9D08E") +
   stat_function(fun = dgamma, args = list(
@@ -335,40 +393,24 @@ p.bai <- ggplot(tr_7i, aes(x = bai_cm2)) +
   theme_minimal()
 
 
-p.log_bai <- ggplot(tr_7i, aes(x = log(bai_cm2))) +
+p.log_bai <- ggplot(tr_7, aes(x = log(bai_cm2))) +
   geom_histogram(aes(y = after_stat(density)),  # Use density for scaling
                  binwidth = 1, color = "black", fill = "#A9D08E") +
   stat_function(fun = dnorm, args = list(
-    mean = mean(log(tr_7i$bai_cm2), na.rm = TRUE),
-    sd = sd(log(tr_7i$bai_cm2), na.rm = TRUE)
+    mean = mean(log(tr_7[bai_cm2 > 0]$bai_cm2), na.rm = TRUE),
+    sd = sd(log(tr_7[bai_cm2 > 0]$bai_cm2), na.rm = TRUE)
     ),
                 color = "red", linetype = "dashed", size = 1) +
   labs(title = "Histogram on log-BAI with Normal Distribution Fit",
        x = "log-bai",
        y = "Density") +
   theme_classic()
-
-
-# p.bai|p.log_bai
-
-for (page in 1: ceiling(length(plot_list)/2)){
-  endpage <-min (length(plot_list), (page-1)*2 +2 )
-print(plot_list[[(page-1)*2 +1]] | plot_list[[endpage]]   +
-  plot_annotation() &
-  theme(plot.margin = margin(5, 5, 5, 5)))
-  
-}
-
-
 cat(paste0("<br><br>"))
 cat("\n\n\n\n")
 
-cat(paste("#####", spc.lst[i.spc], "on bai and log(bai)", "\n\n"))
+cat(paste("#####", "on bai and log(bai)", "\n\n"))
 print(p.bai|p.log_bai  + plot_layout(widths = c(1,1)))
 }
-
-}
-
 ``` 
 
 
