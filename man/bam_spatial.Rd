@@ -4,7 +4,7 @@
 \alias{bam_spatial}
 \title{spatial growth model for large dataset or vast geographical coverage}
 \usage{
-bam_spatial(data, resp_scale = "log", m.candidates)
+bam_spatial(data, resp_scale = "resp_gamma", m.candidates)
 }
 \arguments{
 \item{data}{data containing all necessary columns to run the model}
