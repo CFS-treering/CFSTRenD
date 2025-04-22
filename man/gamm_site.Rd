@@ -4,7 +4,7 @@
 \alias{gamm_site}
 \title{growth model at site-level}
 \usage{
-gamm_site(data, resp_scale = "log", m.candidates)
+gamm_site(data, resp_scale = "resp_gamma", m.candidates)
 }
 \arguments{
 \item{data}{data containing all necessary columns to run the model}

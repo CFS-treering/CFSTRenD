@@ -4,14 +4,22 @@
 \alias{CFS_scale}
 \title{compare the median of tree ring measurement of a specific site to those of nearby sites}
 \usage{
-CFS_scale(site2chk, ref_sites, N.nbs = 10, make.plot = c(FALSE, ""))
+CFS_scale(
+  site2chk,
+  ref_sites,
+  max.dist_km = 20,
+  N.nbs = 10,
+  make.plot = c(FALSE, "")
+)
 }
 \arguments{
-\item{site2chk}{data.table with columns uid_project, uid_site, site_id, species, longitude and latitude}
+\item{site2chk}{data.table with columns uid_site, site_id, species, longitude and latitude}
 
-\item{ref_sites}{reference sites including ring width measurements in wide format}
+\item{ref_sites}{reference sites including species, uid_site, latitude, longitude, uid_radius, year, rw_mm in long format}
 
-\item{N.nbs}{number of nearest-neighbors}
+\item{max.dist_km}{maximum distance to search the neighbors in km}
+
+\item{N.nbs}{number of nearest-neighbors (maximum)}
 
 \item{make.plot}{a list , first item for plot figures or not, second item for the caption of data source}
 }

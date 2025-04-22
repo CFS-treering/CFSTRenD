@@ -4,7 +4,13 @@
 \alias{CFS_qa}
 \title{tree-ring data measurement assessment}
 \usage{
-CFS_qa(dt.input, batch_size = 10000, max.lag = 10, max.iter = 100)
+CFS_qa(
+  dt.input,
+  batch_size = 10000,
+  max.lag = 10,
+  max.iter = 100,
+  min.nseries = 100
+)
 }
 \arguments{
 \item{dt.input}{tree ring data with at least 3 columns (SampleID, Year, RawRing)}
@@ -14,6 +20,8 @@ CFS_qa(dt.input, batch_size = 10000, max.lag = 10, max.iter = 100)
 \item{max.lag}{maximum lag up to which the correlation should be calculated in CCF}
 
 \item{max.iter}{maximum number of iterations of step 2(see Details)}
+
+\item{min.nseries}{minimum number of series to run this function}
 }
 \value{
 A list of 3 elements:

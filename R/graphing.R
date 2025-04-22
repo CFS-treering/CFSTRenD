@@ -315,35 +315,35 @@ plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
 #'
 #' @return An HTML file containing the data report.
 #' @export generate_report
-
-generate_report <- function(robj, usage = 1, output_file = NULL) {
-  # if (!input[[1]] %in% c("data", "model")) stop("the first item needs to be data or model")
-  # robj <- input[[2]]
-  if ( "data.frame" %in% class(robj$tr_all_wide) | "data.table" %in% class(robj$tr_all_wide)) type.templt <- "data" else {
-    if ( "list" %in% class(robj) & !is.null(robj$model)) type.templt <- "model"
-  }
-  # Path to the R Markdown template
-  rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
-  # rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst/rmd", paste0(type.templt,"_report_template.Rmd"))
-
-
-                          # Check if the template exists
-                          if (rmd_file == "") {
-                            stop("Template not found! Ensure 'data_report_template.Rmd' is in inst/rmd/ directory.")
-                          }
-
-                          # Render the report
-                          if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(input = rmd_file,
-                                                                                                      params = list(robj = robj, usage = usage))) else
-
-                            rmarkdown::render(
-                              input = rmd_file,
-                              output_file = output_file,
-                              params = list(robj = robj, usage = usage),
-                              envir = new.env(parent = globalenv()) # Isolate environment
-                            )
-}
-
+#
+# generate_report <- function(robj, reports.sel = c(1,2,3,4), label_trt = "differentiated", parms.qa = c(min.nseries.qa = 20, N.nbs.qa = 6), output_file = NULL) {
+#   # if (!input[[1]] %in% c("data", "model")) stop("the first item needs to be data or model")
+#   # robj <- input[[2]]
+#   if ( "data.frame" %in% class(robj$tr_all_wide) | "data.table" %in% class(robj$tr_all_wide)) type.templt <- "data" else {
+#     if ( "list" %in% class(robj) & !is.null(robj$model)) type.templt <- "model"
+#   }
+#   # Path to the R Markdown template
+#   rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
+#   # rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst/rmd", paste0(type.templt,"_report_template.Rmd"))
+#
+#
+#                           # Check if the template exists
+#                           if (rmd_file == "") {
+#                             stop("Template not found! Ensure 'data_report_template.Rmd' is in inst/rmd/ directory.")
+#                           }
+#
+#                           # Render the report
+#                           if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(input = rmd_file,
+#                                                                                                       params = list(robj = robj, usage = usage))) else
+#
+#                             rmarkdown::render(
+#                               input = rmd_file,
+#                               output_file = output_file,
+#                               params = list(robj = robj, reports.sel =reports.sel, label_trt = label_trt, parms.qa = parms.qa),
+#                               envir = new.env(parent = globalenv()) # Isolate environment
+#                             )
+# }
+#
 
 # generate_vignette <- function(output_file = NULL) {
 #

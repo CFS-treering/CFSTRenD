@@ -20,6 +20,7 @@
 #' @param batch_size  number of pairs to run in a batch, to avoid memory issues in processing large dataset
 #' @param max.lag maximum lag up to which the correlation should be calculated in CCF
 #' @param max.iter maximum number of iterations of step 2(see Details)
+#' @param min.nseries minimum number of series to run this function
 
 #'
 #'
@@ -60,10 +61,11 @@
 #' @export CFS_qa
 #'
 
-CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100){
+CFS_qa <- function(dt.input , batch_size = 10000, max.lag = 10, max.iter = 100, min.nseries = 100){
+  if (length(setdiff(c("species", "SampleID", "Year","RawRing", "RW_trt" ), names(dt.input))) > 0) stop("at least one of the mandatory columns (species, SampleID, Year, RawRing, RW_trt) doesn't exist, please check...")
 
-  if (length(setdiff(c("SampleID", "Year","RawRing", "RW_trt" ), names(dt.input))) > 0) stop("at least one of the mandatory columns (SampleID, Year, RawRing, RW_trt) doesn't exist, please check...")
-
+  if (length(unique(dt.input$species)) > 1) stop("only 1 species is allowed in the dataset...")
+  if (length(unique(dt.input$SampleID)) < min.nseries) stop(paste0("please increase the sample size at minumum: ", min.nseries))
 
   if (nrow(dt.input[, .N, by = .(SampleID, Year)][N > 1]) > 0) stop("SampleID-Year is not unique key, please check...")
   dt.rw_long <- dt.input[, c("SampleID", "Year","RawRing", "RW_trt")]
@@ -248,6 +250,9 @@ names(plot.trt.series)
 
   # Reset to sequential
   plan(sequential)
+  dt.s2.ccf <- data.table(species = unique(dt.input$species), dt.s2.ccf)
+  dt.s2.avg <- data.table(species = unique(dt.input$species), dt.s2.avg)
+  stats_radii <- data.table(species = unique(dt.input$species), stats_radii)
 
   return(list(dt.ccf = dt.s2.ccf, master = dt.s2.avg, plot.lst = plot.lst, dt.stats = stats_radii))
   # the result of step 2 is dt.s2.ccf, samples with qa_code = "Pass" to form the master chronology

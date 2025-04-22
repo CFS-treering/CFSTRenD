@@ -14,7 +14,7 @@ utils::globalVariables(c(
   "se.fit.s.ageC", "selected",   "site_ID1.01.0", "specialchar",   "v.idx",
   "lat", "lon", "meas_date", "ord", "species", "uid_radius.tmp", "value", "variable",
   "year_range", "ymax", "ymax.proj", "ymin", "ymin.proj", "yr.meas",
-  "rw_yend", "rw_ystart",
+  "rw_yend", "rw_ystart","nofill",
 
   # CFS_scale
   "rw.median",  "yr.max", "yr.mn", "ratio_median", "rw.median.nbs", "size_class",
@@ -30,7 +30,12 @@ utils::globalVariables(c(
   "ageC", "res.normalized", "res.normalized.LL",  "res.resp_normalized",
   "lat_use", "lon_use", "start.event",
   # cal.bai
-  "ba_cm2_t_1", "bai_cm2", "radius", "radius_prev", "med.rw"
+  "ba_cm2_t_1", "bai_cm2", "radius", "radius_prev", "med.rw",
+  # tab_...
+  "ar1_rw", "corr_mean_rw", "mean_rw",  "pcorr_mean_rw", "rw.max", "rw.mean","rw.min",
+  # CFS_scale
+  "chk.site", "distGeo", "dist_to_chk_km", "distm"
+
   )
 )
 

@@ -75,7 +75,11 @@ CFS_format <- function (data, usage, out.csv = NULL) {
   setdiff(meta.all0$Variable, meta.all$Variable)
   # must-have meta variables for tr_1 to tr_6
   cols.musthave <-as.character( meta.all[Required == 1 & !(table %in% c("tr_7_ring_widths", "tr_8_uids_updated"))]$Variable)
-  if (usage == 2) cols.musthave <- c("project_name", "site_id", "latitude", "longitude", "tree_id", "species", "sample_id", "radius_id")
+  dt.meta$submission_id <- 1
+  if (usage == 2) {
+    dt.meta$open_data <- FALSE
+    cols.musthave <- c("project_name", "site_id", "latitude", "longitude", "tree_id", "species", "sample_id", "radius_id")
+}
   add.Vars <- setdiff(cols.musthave, names(dt.meta))
 
 if (length(add.Vars) > 0) {
@@ -97,14 +101,17 @@ if (length(add.Vars) > 0) {
   dt.rwl[, year:= as.numeric(str_extract(variable,"\\(?[0-9,.]+\\)?"))]
   # for un-mandatory columns
 
-  if (length(setdiff(meta.all[Required != 1]$Variable, names.data.o)) == 0) print("you have filled all the un-mandatory information") else{
+  meta.all$nofill <- 0
+  meta.all[Variable %in% c("year_range", "rw_ystart", "rw_yend"),nofill := 1]
+
+  if (length(setdiff(as.character(meta.all[nofill == 0 & !(table %in% c("tr_7_ring_widths", "tr_8_uids_updated"))]$Variable), colnames(dt.meta))) == 0) print("you have filled all the un-mandatory information") else{
   cat("\n the following are unmandatory information and not found in your data\n")
 
   # not required, and not reported, prompt to fill with NA
+    fill.meta <- meta.all[nofill == 0 & !(table %in% c("tr_7_ring_widths", "tr_8_uids_updated")) & !(Variable %in% colnames(dt.meta))]
+  # i.table <- i.table[, .(var = paste(Variable, collapse = ",")), by = table]
 
-  i.table <- meta.all[Required != 1 & !(Variable %in% names.data.o)]
-  i.table <- i.table[, .(var = paste(Variable, collapse = ",")), by = table]
-  print (i.table)
+  print (fill.meta[, .(var = paste(Variable, collapse = ",")), by = table])
   # for (i in 1:6){
   #   # ith table
   #   i.table <- meta.all[str_detect(table, paste0("tr_", i)) & Required != 1 & !(Variable %in% names.data.o) ]
@@ -117,7 +124,7 @@ if (length(add.Vars) > 0) {
 
     user_input <- readline(prompt = "do you have info of the above variables? Y to return to complete info, or N to allow the system to fill with NA  (Y/N) : ")
     if (toupper(user_input) == "Y") return() else{
-    fill.meta <- meta.all[!(Variable %in% names(dt.meta))]
+    # fill.meta <- meta.all[!(nofill == 1 &  Required != 1 & Variable %in% names(dt.meta))]
     vars.fill <- as.character(fill.meta$Variable)
     FormatV.fill <- as.character(fill.meta$FormatV)
 
@@ -147,12 +154,12 @@ if (length(add.Vars) > 0) {
 # Latitude range: 41.7°N to 83.1°N
 # Longitude range: 52.6°W to 141.0°W
 # source:  https://www12.statcan.gc.ca/census-recensement/2011/ref/dict/geo016-eng.cfm
-
+if (all(c("latitude", "longitutde") %in% names(dt.new))){
   if (min(dt.new$latitude) < 41.7 | max(dt.new$latitude) > 83.1) stop(paste0("latitude not in range: (41.7 , 83.1)"))
   if (min(dt.new$longitude) < -141 | max(dt.new$longitude) > -52.6) stop(paste0("longitude not in range: (-141 , -52.6)"))
 
   dt.new[, uid_site := .GRP, by = .(site_id, latitude, longitude)]
-
+}else dt.new[, uid_site := .GRP, by = .(site_id)]
   chk.spc<-dt.new[, .N, by = .(site_id, tree_id, species)][, .N, by = .(site_id, tree_id)][N > 1]
 
   if (nrow(chk.spc) > 0) {
@@ -260,9 +267,10 @@ if (length(add.Vars) > 0) {
 #' Apply a k-nearest neighbors (k-NN) method based on geographic location for the same species.
 #' It compares the median tree-ring measurements of a specific site to those of nearby sites
 #'
-#' @param site2chk  data.table with columns uid_project, uid_site, site_id, species, longitude and latitude
-#' @param ref_sites  reference sites including ring width measurements in wide format
-#' @param N.nbs  number of nearest-neighbors
+#' @param site2chk  data.table with columns uid_site, site_id, species, longitude and latitude
+#' @param ref_sites  reference sites including species, uid_site, latitude, longitude, uid_radius, year, rw_mm in long format
+#' @param max.dist_km maximum distance to search the neighbors in km
+#' @param N.nbs  number of nearest-neighbors (maximum)
 #' @param make.plot  a list , first item for plot figures or not, second item for the caption of data source
 #'
 #' @import data.table
@@ -278,51 +286,53 @@ if (length(add.Vars) > 0) {
 
 #'
 
-CFS_scale <- function(site2chk, ref_sites, N.nbs = 10, make.plot = c(FALSE, "")){
+CFS_scale <- function(site2chk, ref_sites, max.dist_km = 20, N.nbs = 10, make.plot = c(FALSE, "")){
   # scale
   if (nrow(site2chk) > 1) stop("we can only process 1 species in 1 site each time ...")
 
-  site.all.spc <- ref_sites[species == site2chk$species,c("uid_project", "uid_site", "site_id", "species", "latitude", "longitude")][, .N, by = .(uid_project, uid_site, site_id, species, latitude, longitude)]
-  rw.all.spc <- merge(ref_sites, site.all.spc[, c("uid_project", "uid_site", "species")], by = c("uid_project", "uid_site", "species"))
+  # check key columns
+  if (length(setdiff(c("species", "uid_site", "latitude","longitude"), names(site2chk))) > 0) stop("at least one of the mandatory columns (species, uid_site, latitude, longitude) doesn't exist, please check...")
+  if (length(setdiff(c("species", "uid_site", "uid_radius","year", "rw_mm"), names(ref_sites))) > 0) stop("at least one of the mandatory columns (species, uid_site, latitude, longitude, uid_radius, year, rw_mm) doesn't exist, please check...")
 
-  closest <- RANN::nn2(site.all.spc[,c("longitude", "latitude")], site2chk[ ,c("longitude", "latitude")], k = N.nbs + 1)
-  # plot(1:length(closest$nn.dists), closest$nn.dists)
-  uid_site.closest <- data.table(ord = 0:N.nbs, uid_project = site.all.spc$uid_project[closest$nn.idx], uid_site = site.all.spc$uid_site[closest$nn.idx], nn.dists = as.numeric(closest$nn.dists))
-  uid_site.closest <- merge(uid_site.closest, site.all.spc[, c("uid_project", "uid_site", "longitude", "latitude")], by = c("uid_project", "uid_site"))
 
-  uid_radius.chk <- merge(rw.all.spc, uid_site.closest[, c("uid_project", "uid_site")], by = c("uid_project", "uid_site"))
-  if (ncol(ref_sites) != ncol(uid_radius.chk)) stop("check the colname of uid_radius.chk")
-  uid_radius.chk <- cbind(uid_radius.chk[, c("uid_project", "uid_site", "species", "uid_radius")], uid_radius.chk[, 45: ncol(uid_radius.chk)])
-  # only consider the value > 0
-  uid_radius.chk.long <- melt(uid_radius.chk, id.vars = c( "species", "uid_project", "uid_site", "uid_radius"))[!is.na(value)][value > 0]
-  uid_radius.chk.long[, year:= as.numeric(as.character(variable))]
-  med.radius <- uid_radius.chk.long[, .(N = .N, rw.median = median(value), yr.mn = min(year), yr.max = max(year)), by = .(species, uid_project, uid_site, uid_radius)]
-  med.site <- med.radius[, .(Ncores = .N, rw.median = median(rw.median), yr.mn = min(yr.mn), yr.max = max(yr.max)), by = .(species, uid_project, uid_site)]
+  site.all.spc <- ref_sites[species == site2chk$species, .N, by = .(uid_site, species, latitude, longitude)]
+  dist.mat <- distm(site2chk[, c("longitude", "latitude")],
+                    site.all.spc[, c("longitude", "latitude")],
+                    fun = distGeo)
+  site.all.spc$dist_to_chk_km <- round(as.vector(t(dist.mat)) / 1000, 1)
+  setorder(site.all.spc, dist_to_chk_km)
+  site.all.spc$ord <- 0: (nrow(site.all.spc) - 1)
+  site.closest <- site.all.spc[ dist_to_chk_km <= max.dist_km & ord <= N.nbs]
 
-  med.radius.yr <- uid_radius.chk.long[, .(N = .N, rw.median = median(value) ), by = .(species, uid_project, uid_site, uid_radius, year)]
-  med.site.yr <- med.radius.yr[, .(Ncores = .N, rw.median = median(rw.median)), by = .(species, uid_project, uid_site, year)]
-  med.site.yr <- merge(med.site.yr, uid_site.closest, by = c("uid_project", "uid_site"))
+  rw.closest <- merge(ref_sites, site.closest[ , c("ord", "uid_site")], by = c("uid_site"))
 
-  chk.site <- merge(uid_site.closest, med.site, by = c("uid_project", "uid_site"))
 
+
+  med.site <- rw.closest[, .(N = .N, rw.median = median(rw_mm), yr.mn = min(year), yr.max = max(year)), by = .(ord, species, uid_site, uid_radius)][,
+    .(Ncores = .N, rw.median = median(rw.median), yr.mn = min(yr.mn), yr.max = max(yr.max)), by = .(ord, species, uid_site)]
+
+  med.site.yr <- rw.closest[, .(N = .N, rw.median = median(rw_mm) ), by = .(ord, species, uid_site, uid_radius, year)][,
+    .(Ncores = .N, rw.median = median(rw.median)), by = .(ord, species, uid_site, year)]
+
+  setorder(med.site.yr, ord, uid_site, year)
   # ratio defines as site2chk/neighbor , when it's smaller means the site2chk's magnitude is smaller,
-  chk.site$rw.ratio <- chk.site[ord == 0]$rw.median/chk.site$rw.median
+  med.site$rw.ratio <- med.site[ord == 0]$rw.median/med.site$rw.median
 
-  chk.site$size_class <- cut(
-    chk.site$rw.ratio,
+  med.site$size_class <- cut(
+    med.site$rw.ratio,
     breaks = c(-Inf, 0.1, 0.2, 0.5, 2, 5, 10, Inf), # Define the breaks
     labels = c("< 0.1", "0.1 - 0.2", "0.2 - 0.5", "0.5 - 2", "2 - 5", "5 - 10", "> 10"), # Define labels
     include.lowest = TRUE
   )
-  if (any(is.na(chk.site$size_class))) {
+  if (any(is.na(med.site$size_class))) {
     warning("Some values in rw.ratio are outside the defined breaks and will be excluded.")
   }
 
 
-  setorder(med.site.yr, ord, uid_project, uid_site, year)
 
-  rw.median <- data.table(chk.site[ord == 0][,c("uid_project", "uid_site","species", "rw.median")],
-                      chk.site[ord > 0][, .(N.nbs = .N, rw.median.nbs = median(rw.median))])[,ratio_median := round(rw.median/rw.median.nbs,1)]
+
+  rw.median <- data.table(med.site[ord == 0][,c( "uid_site","species", "rw.median")],
+                          med.site[ord > 0][, .(N.nbs = .N, rw.min.nbs = min(rw.median), rw.max.nbs = max(rw.median), rw.median.nbs = median(rw.median))])[,ratio_median := round(rw.median/rw.median.nbs,2)]
 
 
   if (make.plot[1] == TRUE){
@@ -375,9 +385,9 @@ CFS_scale <- function(site2chk, ref_sites, N.nbs = 10, make.plot = c(FALSE, ""))
             # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
             ))
   }
-  setnames(chk.site, "uid_site", "uid_site.nb")
-  chk.site<- data.table(rw.median[, "uid_site"], chk.site)
-  return(list(chk.site = chk.site, ratio.median = rw.median))
+
+
+  return(list(chk.site = med.site, ratio.median = rw.median))
 }
 
 

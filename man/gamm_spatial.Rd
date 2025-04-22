@@ -4,7 +4,7 @@
 \alias{gamm_spatial}
 \title{spatial growth model at regional-level (multiple sites)}
 \usage{
-gamm_spatial(data, resp_scale = "log", m.candidates)
+gamm_spatial(data, resp_scale = "resp_gamma", m.candidates)
 }
 \arguments{
 \item{data}{data containing all necessary columns to run the model}

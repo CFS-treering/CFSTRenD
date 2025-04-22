@@ -1,3 +1,41 @@
+#' a general gam model
+
+#' @description
+#' gam model benefiting the model selection procedure using ML method
+#'
+#'
+#' @param data data containing all necessary columns to run the model
+#' @param resp_scale the scale of response variable. default is original scale with family = Gamma("log"); "log" for predicting log-scale with family = gaussian("identity") ; "hybrid" for predicting original scale with family = gaussian("identity")
+#' @param m.candidates the list of formulas.
+#'
+#'
+#' @import mgcv
+#' @import nlme
+#' @import stats
+#' @import utils
+#' @import data.table
+#'
+#'
+#' @return list including model, fitting statistics, ptable, stable and prediction table
+#' @details
+#' This function models a gam model without considering random effects or autocorrelation.
+
+#' If users specify multiple candidate models through the m.candidates argument, the function will fit each candidate model using the maximum likelihood (ML) method.
+#' The Akaike Information Criterion (AIC) will then be compared to determine the best-fitting model. Once the optimal model is identified,
+#' it will be refitted using the restricted maximum likelihood (REML) method and output the results.
+#'
+#' If users specify only 1 candidate model through the m.candidates argument, the model is fitted with "REML" method.
+
+#' @export gam_mod
+
+gam_mod <- function(data, resp_scale = "", m.candidates){
+
+  gamm_main(data , resp_scale , m.option = 0, m.candidates)
+
+}
+
+
+
 #' detrending model on tree-ring width series
 
 #' @description
@@ -31,7 +69,7 @@
 
 #' @export gamm_radius
 
-gamm_radius <- function(data, resp_scale = "log", m.candidates){
+gamm_radius <- function(data, resp_scale = "resp_gamma", m.candidates){
 
   gamm_main(data , resp_scale , m.option = 1, m.candidates)
 
@@ -72,7 +110,7 @@ gamm_radius <- function(data, resp_scale = "log", m.candidates){
 #' @export gamm_site
 #'
 #'
-gamm_site <- function(data, resp_scale = "log", m.candidates){
+gamm_site <- function(data, resp_scale = "resp_gamma", m.candidates){
 
   data$uid_tree.fac <- as.factor(as.character(data$uid_tree))
   gamm_main(data , resp_scale , m.option = 2, m.candidates )
@@ -113,7 +151,7 @@ gamm_site <- function(data, resp_scale = "log", m.candidates){
 
 #' @export gamm_spatial
 
-gamm_spatial <- function(data, resp_scale = "log", m.candidates){
+gamm_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
   data$uid_tree.fac <- as.factor(as.character(data$uid_tree))
   data$uid_site.fac <- as.factor(as.character(data$uid_site))
   m.candidates <- paste0(m.candidates, " + s(uid_site.fac, bs = 're')")
@@ -164,7 +202,7 @@ gamm_spatial <- function(data, resp_scale = "log", m.candidates){
 
 #' @export bam_spatial
 
-bam_spatial <- function(data, resp_scale = "log", m.candidates){
+bam_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
   data$uid_tree.fac <- as.factor(as.character(data$uid_tree))
   data$uid_site.fac <- as.factor(as.character(data$uid_site))
   m.candidates <- paste0(m.candidates, " + s(uid_site.fac, bs = 're')")
@@ -175,25 +213,38 @@ bam_spatial <- function(data, resp_scale = "log", m.candidates){
 
 
 # main function
-gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
+gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
   if (length(m.candidates) == 0) stop("must assign the equation(s) to m.candidates")
-  if (resp_scale == "log") {
-# if in log-scale, use gaussian distribution
-    famil = gaussian("identity")
-  }else {
-    # in orginal scale, use Gamma with log link function
-    famil = Gamma("log")
-    if (resp_scale == "hybrid") {
+  if ( !(resp_scale %in% c("resp_log", "resp_gamma", "resp_gaussian"))) stop(paste0( "please check resp_scale, it allows 3 options: resp_log, on log-scale of resp; resp_gaussian, on response scale assuming gaussian distribution; resp_gamma, on response scale with family Gamma(log)"))
+#   if (resp_scale == "resp_log") {
+# # if in log-scale, use gaussian distribution
+#     famil = gaussian("identity")
+#   }else {
+#     # in orginal scale, use Gamma with log link function
+#     famil = Gamma("log")
+#     if (resp_scale == "resp_gaussian") {
+#
+#       famil = gaussian("identity")
+#     }
+#   }
 
-      famil = gaussian("identity")
-    }
-  }
+  if (resp_scale == "resp_log") famil = gaussian("identity")
+  if (resp_scale == "resp_gaussian") famil = gaussian("identity")
+  if (resp_scale == "resp_gamma") famil = Gamma("log")
+
   # for comparing and selecting model on AIC
   if (length(m.candidates) > 1){
     for (i in 1:length(m.candidates)){
       formul <- as.formula(m.candidates[i])
       # in log-scale, log-transfrom response variable
-      if (resp_scale == "log") formul <- update(formul, log(.) ~ .)
+      if (resp_scale == "resp_log") formul <- update(formul, log(.) ~ .)
+
+      if (m.option == 0){
+
+        m.tmp <- gam(formul,
+                      method = "ML",family = famil, data = data)
+
+      }
       if (m.option == 1){
 
         m.tmp <- gamm(formul,
@@ -233,10 +284,18 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
 
       }
       if (m.option < 4){
-      aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp$lme), R2 = summary(m.tmp$gam)$r.sq, methd = "ML")
+
+      aic.tmp <- data.table(form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), R2 = summary(m.tmp)$r.sq, methd = "ML")
+      if (m.option == 0) {
+        aic.tmp$aic <-  AIC(m.tmp)
+        aic.tmp$bic <-  BIC(m.tmp)}else {
+          aic.tmp$aic <-  AIC(m.tmp$lme)
+          aic.tmp$bic <-  BIC(m.tmp$lme)
+
+        }
       }else{
 
-        aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp), R2 = summary(m.tmp)$r.sq, methd = "ML")
+        aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp), bic =  BIC(m.tmp), R2 = summary(m.tmp)$r.sq, methd = "ML")
 
     }
 
@@ -268,9 +327,16 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
   }else{
     # for 1 equation only
     form.sel <- as.formula(m.candidates)
-    if (resp_scale == "log") form.sel <- update(form.sel, log(.) ~ .)
+    if (resp_scale == "resp_log") form.sel <- update(form.sel, log(.) ~ .)
   }
   # fitting REML for prediction
+
+  if (m.option == 0) {
+    m.sel <- gam(form.sel,
+                method = "REML",family = famil, data = data)
+
+  }
+
   if (m.option == 1) {
     m.sel <- gamm(form.sel,
                   correlation = corCAR1(value = 0.5),
@@ -283,7 +349,7 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
                   method = "REML",family = famil, data = data)
     data[, res.normalized:=residuals(m.sel$lme, type = "normalized")]
     # Extract the substring inside parentheses in case in log-scale
-    y.char <- sub(".*\\((.*?)\\).*", "\\1", all.vars(m.sel$gam$formula)[1])
+    y.char <- sub(".*\\((.*?)\\).*", "\\1", all.vars(msel.gam$formula)[1])
 
     }
   if (m.option == 4){
@@ -348,7 +414,7 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
       rm(nb, knea, moran.I.o, moran.I.r)
       if (moranI$p.value.obs < 0.1 & moranI$p.value.res < 0.1 & nrow(y.site) > 5) {
       if (m.option == 3)  {
-        form.sel <- update(m.sel$gam$formula, . ~ . + s(latitude, longitude, bs = "sos"))
+        form.sel <- update(msel.gam$formula, . ~ . + s(latitude, longitude, bs = "sos"))
         m.sel <- gamm(form.sel,  data = data,
                       random = list(uid_tree.fac= ~1),correlation =  corCAR1(value = 0.5),
                       family = famil)
@@ -397,27 +463,35 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
 
 
   if (m.option < 4){
-  pred.terms  <-as.data.frame( predict(m.sel$gam, type="terms",se.fit=TRUE))
-  rhs_terms <- attr(terms(m.sel$gam$formula), "term.labels")
+    if (m.option == 0) msel.gam <- m.sel else msel.gam <- m.sel$gam
+  pred.terms  <-as.data.frame( predict(msel.gam, type="terms",se.fit=TRUE))
+  rhs_terms <- attr(terms(msel.gam$formula), "term.labels")
   # to set column names for only 1 term, by default it's s.year. and s.year.1 for s(year), instead of fit and se.fit
   if (length(rhs_terms) == 1){
 
   names(pred.terms) <-paste0(c("fit.", "se.fit."), sub("s\\(([^,\\)]+).*", "\\1", rhs_terms))
   }
 
-  fit.y <- as.data.frame(predict(m.sel$gam, type = "response", se.fit = TRUE))
+  fit.y <- as.data.frame(predict(msel.gam, type = "response", se.fit = TRUE))
   names(fit.y) <- c("fit.resp", "se.fit.resp")
   tmp.y <- data.table(data, pred.terms, fit.y)
-  tmp.y$res.resp <- residuals(m.sel$gam, type = "response")
-  tmp.y$res.resp_normalized <- residuals(m.sel$lme, type = "normalized")
+  tmp.y$res.resp <- residuals(msel.gam, type = "response")
+  if (m.option > 0) tmp.y$res.resp_normalized <- residuals(msel.gam$lme, type = "normalized")
   if ("res.normalized" %in% names(tmp.y)) tmp.y$res.normalized <- NULL
-  # if (resp_scale == "log") setnames(tmp.y, c("fit.resp", "se.fit.resp", "res.resp", "res.resp_normalized"),
+  # if (resp_scale == "resp_log") setnames(tmp.y, c("fit.resp", "se.fit.resp", "res.resp", "res.resp_normalized"),
   #                                   c("fit.log_resp", "se.fit.log_resp", "res.log_resp", "res.log_resp_normalized"))
 
 
-  ptable <- data.table(Parameter = row.names(summary(m.sel$gam)$p.table), summary(m.sel$gam)$p.table )
-  stable <- data.table(Parameter = row.names(summary(m.sel$gam)$s.table), summary(m.sel$gam)$s.table)
-  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel$lme), R2 = summary(m.sel$gam)$r.sq, methd = "REML")
+  ptable <- data.table(Parameter = row.names(summary(msel.gam)$p.table), summary(msel.gam)$p.table )
+  stable <- data.table(Parameter = row.names(summary(msel.gam)$s.table), summary(msel.gam)$s.table)
+  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), R2 = summary(msel.gam)$r.sq, methd = "REML")
+  if (m.option == 0) {
+    aic.reml$aic <-  AIC(msel.gam)
+    aic.reml$bic <-  BIC(msel.gam)}else {
+      aic.reml$aic <-  AIC(msel.gam$lme)
+      aic.reml$bic <-  BIC(msel.gam$lme)
+
+  }
   }else{
     pred.terms  <-as.data.frame( predict(m.sel, type="terms",se.fit=TRUE))
     fit.y <- as.data.frame(predict(m.sel, type = "response", se.fit = TRUE))
@@ -431,12 +505,15 @@ gamm_main <- function(data, resp_scale = "log", m.option, m.candidates){
 
     ptable <- data.table(Parameter = row.names(summary(m.sel)$p.table), summary(m.sel)$p.table )
     stable <- data.table(Parameter = row.names(summary(m.sel)$s.table), summary(m.sel)$s.table)
-    aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), R2 = summary(m.sel)$r.sq, methd = "fREML")
+    aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), bic = BIC(m.sel), R2 = summary(m.sel)$r.sq, methd = "fREML")
 
   }
   # rename log-scale
-  if (resp_scale == "log") setnames(tmp.y, c("fit.resp", "se.fit.resp", "res.resp", "res.resp_normalized"),
-                                    c("fit.log_resp", "se.fit.log_resp", "res.log_resp", "res.log_resp_normalized"))
+  if (resp_scale == "resp_log") {
+    setnames(tmp.y, c("fit.resp", "se.fit.resp", "res.resp"),
+                                    c("fit.log_resp", "se.fit.log_resp", "res.log_resp"))
+  if ("res.resp_normalized" %in% names(tmp.y)) setnames(tmp.y, "res.resp_normalized", "res.log_resp_normalized" )
+    }
   # if (!is.null(out.csv)){
   #
   #   if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
