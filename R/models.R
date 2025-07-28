@@ -11,7 +11,7 @@
 #'
 #' @import mgcv
 #' @import nlme
-#' @import stats
+#' @importFrom MuMIn AICc
 #' @import utils
 #' @import data.table
 #'
@@ -50,6 +50,7 @@ gam_mod <- function(data, resp_scale = "", m.candidates){
 #' @import mgcv
 #' @import nlme
 #' @import stats
+#' @importFrom MuMIn AICc
 #' @import utils
 #' @import data.table
 #'
@@ -90,6 +91,7 @@ gamm_radius <- function(data, resp_scale = "resp_gamma", m.candidates){
 #'
 #' @import mgcv
 #' @import nlme
+#' @importFrom MuMIn AICc
 #' @import stats
 #' @import utils
 #' @import data.table
@@ -132,6 +134,7 @@ gamm_site <- function(data, resp_scale = "resp_gamma", m.candidates){
 #' @import mgcv
 #' @import nlme
 #' @import stats
+#' @importFrom MuMIn AICc
 #' @import utils
 #' @import data.table
 #'
@@ -179,6 +182,7 @@ gamm_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
 #' @import itsadug
 #' @import nlme
 #' @import stats
+#' @importFrom MuMIn AICc
 #' @import utils
 #' @import data.table
 #' @import sp
@@ -283,21 +287,23 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
         plan(sequential)
 
       }
-      if (m.option < 4){
+      # if (m.option < 4){
 
-      aic.tmp <- data.table(form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), R2 = summary(m.tmp)$r.sq, methd = "ML")
-      if (m.option == 0) {
-        aic.tmp$aic <-  AIC(m.tmp)
-        aic.tmp$bic <-  BIC(m.tmp)}else {
-          aic.tmp$aic <-  AIC(m.tmp$lme)
-          aic.tmp$bic <-  BIC(m.tmp$lme)
+      # aic.tmp <- data.table(form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), R2 = summary(m.tmp)$r.sq, methd = "ML")
+      # if (m.option == 0) {
+      #   aic.tmp$aic <-  AIC(m.tmp)
+      #   aic.tmp$aicc <-  AICc(m.tmp)
+      #   aic.tmp$bic <-  BIC(m.tmp)}else {
+      #     aic.tmp$aic <-  AIC(m.tmp$lme)
+      #     aic.tmp$aicc <-  AICc(m.tmp$lme)
+      #     aic.tmp$bic <-  BIC(m.tmp$lme)
+      #
+      #   }
+      # }else{
 
-        }
-      }else{
+        aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp), aicc = AICc(m.tmp), bic =  BIC(m.tmp), R2 = summary(m.tmp)$r.sq, methd = "ML")
 
-        aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp), bic =  BIC(m.tmp), R2 = summary(m.tmp)$r.sq, methd = "ML")
-
-    }
+    # }
 
       if (i == 1) {
         aic.mn <- aic.tmp$aic
@@ -314,8 +320,8 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
       }
       rm(aic.tmp, m.tmp)
     }
-    aic.all[aic == min(aic), selected := "*"]
-    form.sel <- as.formula(aic.all[aic == min(aic)]$form)
+    aic.all[aicc == min(aicc), selected := "*"]
+    form.sel <- as.formula(aic.all[aicc == min(aicc)]$form)
     rm(m.sel)
     # if (!is.null(out.csv)){
     #
@@ -349,7 +355,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
                   method = "REML",family = famil, data = data)
     data[, res.normalized:=residuals(m.sel$lme, type = "normalized")]
     # Extract the substring inside parentheses in case in log-scale
-    y.char <- sub(".*\\((.*?)\\).*", "\\1", all.vars(msel.gam$formula)[1])
+    y.char <- sub(".*\\((.*?)\\).*", "\\1", all.vars(m.sel$gam$formula)[1])
 
     }
   if (m.option == 4){
@@ -397,6 +403,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
       data[, c("lon_use", "lat_use") := list(round(longitude,1), round(latitude,1) )]
 
       y.site <- data[!is.na(res.normalized), .(obs.med = median(get(y.char)), res.med = median(res.normalized)), by = .(lon_use, lat_use )]
+      if (nrow(y.site) > 5) {
       coordinates(y.site) <- ~ lon_use+lat_use
       knea <- knearneigh(coordinates(y.site), longlat = TRUE)
       nb <- knn2nb(knea)
@@ -412,9 +419,9 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
       names(moran.I.r) <- paste0(names(moran.I.r), ".res")
       moranI <- cbind(moran.I.o, moran.I.r)
       rm(nb, knea, moran.I.o, moran.I.r)
-      if (moranI$p.value.obs < 0.1 & moranI$p.value.res < 0.1 & nrow(y.site) > 5) {
+      if (moranI$p.value.obs < 0.1 & moranI$p.value.res < 0.1 ) {
       if (m.option == 3)  {
-        form.sel <- update(msel.gam$formula, . ~ . + s(latitude, longitude, bs = "sos"))
+        form.sel <- update(m.sel$gam$formula, . ~ . + s(latitude, longitude, bs = "sos"))
         m.sel <- gamm(form.sel,  data = data,
                       random = list(uid_tree.fac= ~1),correlation =  corCAR1(value = 0.5),
                       family = famil)
@@ -457,6 +464,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
         moranI <- cbind(moranI, moran.I.r_LL)
 
       }
+    }
     } # m.option >= 3, for testing spatial effect, and adding s(lat, lon) if necessary
   # }
 
@@ -466,17 +474,19 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
     if (m.option == 0) msel.gam <- m.sel else msel.gam <- m.sel$gam
   pred.terms  <-as.data.frame( predict(msel.gam, type="terms",se.fit=TRUE))
   rhs_terms <- attr(terms(msel.gam$formula), "term.labels")
-  # to set column names for only 1 term, by default it's s.year. and s.year.1 for s(year), instead of fit and se.fit
+  # to set column names for only 1 term,
   if (length(rhs_terms) == 1){
-
+  if (length(names(pred.terms)) == 2) # only for 1 term with fit and se.fit
   names(pred.terms) <-paste0(c("fit.", "se.fit."), sub("s\\(([^,\\)]+).*", "\\1", rhs_terms))
   }
+
+  pred.terms <- format_byterm(msel.gam, pred.terms)
 
   fit.y <- as.data.frame(predict(msel.gam, type = "response", se.fit = TRUE))
   names(fit.y) <- c("fit.resp", "se.fit.resp")
   tmp.y <- data.table(data, pred.terms, fit.y)
   tmp.y$res.resp <- residuals(msel.gam, type = "response")
-  if (m.option > 0) tmp.y$res.resp_normalized <- residuals(msel.gam$lme, type = "normalized")
+  if (m.option > 0) tmp.y$res.resp_normalized <- residuals(m.sel$lme, type = "normalized")
   if ("res.normalized" %in% names(tmp.y)) tmp.y$res.normalized <- NULL
   # if (resp_scale == "resp_log") setnames(tmp.y, c("fit.resp", "se.fit.resp", "res.resp", "res.resp_normalized"),
   #                                   c("fit.log_resp", "se.fit.log_resp", "res.log_resp", "res.log_resp_normalized"))
@@ -484,14 +494,19 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
   ptable <- data.table(Parameter = row.names(summary(msel.gam)$p.table), summary(msel.gam)$p.table )
   stable <- data.table(Parameter = row.names(summary(msel.gam)$s.table), summary(msel.gam)$s.table)
-  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), R2 = summary(msel.gam)$r.sq, methd = "REML")
-  if (m.option == 0) {
-    aic.reml$aic <-  AIC(msel.gam)
-    aic.reml$bic <-  BIC(msel.gam)}else {
-      aic.reml$aic <-  AIC(msel.gam$lme)
-      aic.reml$bic <-  BIC(msel.gam$lme)
+  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), aicc = AICc(m.sel), bic =  BIC(m.sel), R2 = summary(msel.gam)$r.sq,  methd = "REML")
+  # if (m.option == 0) {
+  #   aic.reml$aic <-  AIC(msel.gam)
+  #   aic.reml$aicc <- AICc(msel.gam)
+  #   aic.reml$bic <-  BIC(msel.gam)
+  #
+  #   }else {
+  #     aic.reml$aic <-  AIC(m.sel$lme)
+  #     aic.reml$aicc <- AICc(m.sel$lme)
+  #     aic.reml$bic <-  BIC(m.sel$lme)
+  #
+  # }
 
-  }
   }else{
     pred.terms  <-as.data.frame( predict(m.sel, type="terms",se.fit=TRUE))
     fit.y <- as.data.frame(predict(m.sel, type = "response", se.fit = TRUE))
@@ -505,7 +520,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
     ptable <- data.table(Parameter = row.names(summary(m.sel)$p.table), summary(m.sel)$p.table )
     stable <- data.table(Parameter = row.names(summary(m.sel)$s.table), summary(m.sel)$s.table)
-    aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), bic = BIC(m.sel), R2 = summary(m.sel)$r.sq, methd = "fREML")
+    aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), aicc = AICc(m.sel), bic = BIC(m.sel), R2 = summary(m.sel)$r.sq, methd = "fREML")
 
   }
   # rename log-scale
@@ -578,4 +593,75 @@ cal.bai <- function(dt.long, id , rw){
   # Drop the radius columns if not needed
   dt.long[, c("radius", "radius_prev") := NULL]
   return(dt.long)
+}
+
+
+#' format wide to long
+
+#' @description
+#' convert the format of term prediction with by from wide to long in model$pred
+#'
+#'
+#' @param model a gam model
+#'
+#' @import data.table
+#'
+#'
+#' @return dt.pred, the term prediction by gam were formed as 1 term, for both fits and stand error
+#'
+#' @export format_byterm
+
+
+format_byterm <- function(model, dt.pred){
+  if (is.null(model) | is.null(dt.pred)) stop("please refit the model with package CFSTRenD...")
+
+  setDT(dt.pred)
+  rhs_terms <-attr(terms(model$formula), "term.labels")
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # Keep only terms with 's(' and 'by ='
+  smooth_with_by <- rhs_terms[str_detect(rhs_terms, "s\\([^\\)]+by\\s*=")]
+
+  # Extract the variable and the 'by' category
+  matched <- str_match(smooth_with_by, "s\\(([^,]+),[^)]*?by\\s*=\\s*([^,\\)\\s]+)")
+  # matched <-setDT (as.data.frame(matched))
+  # # Lists:
+  # x.lst <- matched[, 2]  # first argument to s()
+  # by.lst <- matched[, 3]    # value after 'by ='
+  dt.pred$byterm <- NA_character_
+
+  # not necessary as only by term appeared in matched
+  # ix <- 1
+  # while (ix <= nrow(matched)) {
+  #
+  #
+  #   fit.s.clim <- paste0("fit.s.", matched[, 2][ix], "..", matched[, 3][ix])
+  #   if (any(str_detect(names(dt.pred), fit.s.clim)) == TRUE) ix <- ix + 1 else matched <- matched[-ix,]
+  #
+  # }
+
+
+  # se extraction from gratia is on the term only, so slightly smaller than mgcv "term" use mgcv to keep consistence.
+  if (nrow(matched) > 0){
+
+    for (ix in 1: nrow(matched)){
+
+      fit.s.clim <- paste0("fit.s.", matched[, 2][ix], "..", matched[, 3][ix])
+
+      for (se in c("", "se.")){
+
+        cols_to_sum <- grep(paste0("^", se, fit.s.clim), names(dt.pred), value = TRUE)
+
+        dt.pred$new_column <- rowSums(dt.pred[, cols_to_sum, with = FALSE])
+
+        setnames(dt.pred, "new_column", paste0( se, strsplit(fit.s.clim, paste0(".", matched[, 3][ix]) )))
+        dt.pred <- dt.pred[, !names(dt.pred) %in% cols_to_sum, with = FALSE]
+
+      }
+      dt.pred$byterm <- paste(paste0(matched[, 2], "-", matched[, 3]), collapse = ", ")
+
+    }
+    }
+
+  return(dt.pred)
 }

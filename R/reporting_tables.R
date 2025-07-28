@@ -18,8 +18,8 @@ generate_report <- function(robj, reports.sel = c(1,2,3,4), label_trt = "differe
     if ( "list" %in% class(robj) & !is.null(robj$model)) type.templt <- "model"
   }
   # Path to the R Markdown template
-  # rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
-  rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst/rmd", paste0(type.templt,"_report_template_func3.Rmd"))
+  rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
+  # rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst/rmd", paste0(type.templt,"_report_template_func3.Rmd"))
 
 
   # Check if the template exists

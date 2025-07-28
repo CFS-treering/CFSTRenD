@@ -19,7 +19,7 @@ utils::globalVariables(c(
   # CFS_scale
   "rw.median",  "yr.max", "yr.mn", "ratio_median", "rw.median.nbs", "size_class",
   "list.tbl", "pct.species", "spc.pct", "nuids", "bark_thickness_mm",
-  "block_id","rw.N.sc",
+  "block_id","rw.N.sc","dist_to_chk_m",
 
   # CFS_qa
   "acf.trt", "ccf.ord", "max_lag", "max_ccf", "SampleID.chr", "RawRing", "RW_trt", "Year",
@@ -28,7 +28,7 @@ utils::globalVariables(c(
 
   # gamm_main
   "ageC", "res.normalized", "res.normalized.LL",  "res.resp_normalized",
-  "lat_use", "lon_use", "start.event",
+  "lat_use", "lon_use", "start.event", "aicc",
   # cal.bai
   "ba_cm2_t_1", "bai_cm2", "radius", "radius_prev", "med.rw",
   # tab_...

@@ -46,12 +46,12 @@ library(stringr)
  #  samples69.trt <- CFS_format(data = list(samples69.o, 39:140), usage = 1, out.csv = NULL)
  #
 # dominique
-# load("C:/Users/xjguo/OneDrive - NRCan RNCan/driveP/2025_/demand/dominique/rwl.all.Rdata")
-# rwl.all.trt <- CFS_format(data = list(rwl.all, 4:179), usage = 2)
+load("C:/Users/xjguo/OneDrive - NRCan RNCan/driveP/2025_/demand/dominique/rwl.all.Rdata")
+rwl.all.trt <- CFS_format(data = list(rwl.all, 4:179), usage = 2)
 # Bijay
-load("C:/Users/xjguo/OneDrive - NRCan RNCan/driveP/2025_/Martin/demand/2025-03-27 Bijay/rwl.all.Rdata")
-
-rwl.all.trt <- CFS_format(data = list(trw.all, 6:210), usage = 2)
+# load("C:/Users/xjguo/OneDrive - NRCan RNCan/driveP/2025_/Martin/demand/2025-03-27 Bijay/rwl.all.Rdata")
+# 
+# rwl.all.trt <- CFS_format(data = list(trw.all, 6:210), usage = 2)
   usage <- 2; robj <- rwl.all.trt
 # robj <- params$robj
 # usage <- params$usage

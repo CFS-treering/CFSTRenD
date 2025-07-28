@@ -253,11 +253,11 @@ if (all(c("latitude", "longitutde") %in% names(dt.new))){
 
 
       }
+  result <- list(  tr_all_long = list(tr_1_projects = tr_1_projects, tr_2_sites= tr_2_sites, tr_3_trees = tr_3_trees, tr_4_meas = tr_4_meas, tr_5_samples = tr_5_samples,
+                                      tr_6_radiuses = tr_6_radiuses,  tr_7_ring_widths = tr_7_ring_widths), tr_all_wide = tr_all_wide, complete_vars = complete_vars)
 
-
-  return(list(  tr_all_long = list(tr_1_projects = tr_1_projects, tr_2_sites= tr_2_sites, tr_3_trees = tr_3_trees, tr_4_meas = tr_4_meas, tr_5_samples = tr_5_samples,
-                                                tr_6_radiuses = tr_6_radiuses,  tr_7_ring_widths = tr_7_ring_widths), tr_all_wide = tr_all_wide, complete_vars = complete_vars)
-  )
+  class(result) <- "cfs_format"
+  return( result )
 
 }
 
@@ -275,7 +275,7 @@ if (all(c("latitude", "longitutde") %in% names(dt.new))){
 #'
 #' @import data.table
 #' @import stringr
-#' @import RANN
+#' @import geosphere
 #' @importFrom scales pretty_breaks
 #' @import patchwork
 #'
@@ -299,8 +299,10 @@ CFS_scale <- function(site2chk, ref_sites, max.dist_km = 20, N.nbs = 10, make.pl
   dist.mat <- distm(site2chk[, c("longitude", "latitude")],
                     site.all.spc[, c("longitude", "latitude")],
                     fun = distGeo)
-  site.all.spc$dist_to_chk_km <- round(as.vector(t(dist.mat)) / 1000, 1)
-  setorder(site.all.spc, dist_to_chk_km)
+  site.all.spc$dist_to_chk_m <- as.vector(t(dist.mat))
+
+  site.all.spc$dist_to_chk_km <- round(site.all.spc$dist_to_chk_m / 1000, 1)
+  setorder(site.all.spc, dist_to_chk_m)
   site.all.spc$ord <- 0: (nrow(site.all.spc) - 1)
   site.closest <- site.all.spc[ dist_to_chk_km <= max.dist_km & ord <= N.nbs]
 
@@ -309,14 +311,14 @@ CFS_scale <- function(site2chk, ref_sites, max.dist_km = 20, N.nbs = 10, make.pl
 
 
   med.site <- rw.closest[, .(N = .N, rw.median = median(rw_mm), yr.mn = min(year), yr.max = max(year)), by = .(ord, species, uid_site, uid_radius)][,
-    .(Ncores = .N, rw.median = median(rw.median), yr.mn = min(yr.mn), yr.max = max(yr.max)), by = .(ord, species, uid_site)]
+    .(Ncores = .N, rw.median = round(median(rw.median), 2), yr.mn = min(yr.mn), yr.max = max(yr.max)), by = .(ord, species, uid_site)]
 
   med.site.yr <- rw.closest[, .(N = .N, rw.median = median(rw_mm) ), by = .(ord, species, uid_site, uid_radius, year)][,
     .(Ncores = .N, rw.median = median(rw.median)), by = .(ord, species, uid_site, year)]
 
   setorder(med.site.yr, ord, uid_site, year)
   # ratio defines as site2chk/neighbor , when it's smaller means the site2chk's magnitude is smaller,
-  med.site$rw.ratio <- med.site[ord == 0]$rw.median/med.site$rw.median
+  med.site$rw.ratio <- round(med.site[ord == 0]$rw.median/med.site$rw.median,2)
 
   med.site$size_class <- cut(
     med.site$rw.ratio,
@@ -386,8 +388,9 @@ CFS_scale <- function(site2chk, ref_sites, max.dist_km = 20, N.nbs = 10, make.pl
             ))
   }
 
-
-  return(list(chk.site = med.site, ratio.median = rw.median))
+  result <- list(chk.site = med.site, ratio.median = rw.median)
+  class(result) <- "cfs_scale"
+  return()
 }
 
 
@@ -430,7 +433,7 @@ CFS_freq <- function(tr_meta,  uid_level, cutoff_yr = -999,geo_resolution = c(5,
   if (cutoff_yr > 0) dist_uids <- data.table(uid_label = paste0(uid_level, "_yr", cutoff_yr), dist_uids) else
     dist_uids <- data.table(uid_label = uid_level, dist_uids)
   setorder(dist_uids, -pct.species, species, -lat)
-
+  class(dist_uids) <- "cfs_freq"
 
   return(dist_uids)
 }
