@@ -2,67 +2,135 @@
 #' @description
 #' plotting ccf results for each tree
 #'
-#' @param plot.lst plot list from generate_plots
-#' @param out.series SampleID list to be plotted, default -999 for output all samples
-#' @param caption caption of the plots
-#' @param out.pdf output file name including path/filename.pdf, default NULL for device screen
+#' @param qa.trt object "cfs_qa" from CFS_qa() function
+#' @param qa.out_series SampleID list to be plotted, default -999 for output all samples
 
 
 
-#' @import data.table
-#' @import gridExtra
-#' @import patchwork
-#' @importFrom grDevices dev.off pdf
+#' @export plot_qa
 
-#' @export plots_qa
+plot_qa <- function(qa.trt, qa.out_series = "all" ) {
 
-plots_qa <- function(plot.lst, out.series = "all", caption = "CFS-TRenD V1.2 samples69", out.pdf= NULL ) {
+  if (!inherits(qa.trt, "cfs_qa")) stop("please check the input of qa.trt, make sure it's the result of CFS_qa() function")
+  dt.trt.series <- qa.trt$dt.plots$dt.trt.series
+  dt.raw.series <- qa.trt$dt.plots$dt.raw.series
 
-  if (nchar(caption) == 0) stop("please specify caption")
 
-  samples.all <- names(plot.lst$plot.raw.series)
+  dt.trt.ccf <- qa.trt$dt.plots$dt.trt.ccf
+  dt.raw.ccf <- qa.trt$dt.plots$dt.raw.ccf
 
-  if (all(tolower(out.series) == "all")) idx.lst <- seq_along(samples.all) else {
-    idx.lst <- sapply(out.series, function(item) match(item, samples.all))
+
+  samples.all <- str_split_fixed(colnames(dt.trt.series)[3:ncol(dt.trt.series)], "\\_",2)[,2]
+
+  if (all(tolower(qa.out_series) == "all") == TRUE) idx.lst <- seq_along(samples.all) else {
+    idx.lst <- sapply(qa.out_series, function(item) match(item, samples.all))
     idx.lst <- idx.lst[!is.na(idx.lst)]
 
   }
 
 
-  if (all(is.na(idx.lst))) stop("cannot find out.series, please verify if they exist in sample.lst")
+  if (any(is.na(idx.lst))) stop("please verify qa.out_series, some or all cannot be found...")
+
+  # ccf of all samples with the chronologies
+  plot.trt.series <- lapply(2+idx.lst, create_plot.series, data = dt.trt.series)
+  plot.raw.series <- lapply(2+idx.lst, create_plot.series, data = dt.raw.series)
+  names(plot.trt.series) <- samples.all[idx.lst]
+  names(plot.raw.series) <- samples.all[idx.lst]
+
+
+  plot.trt.ccf <- lapply(1+idx.lst, create_barplot, data = dt.trt.ccf)
+  plot.raw.ccf <- lapply(1+idx.lst, create_barplot, data = dt.raw.ccf)
+
+  names(plot.trt.ccf) <- samples.all[idx.lst]
+  names(plot.raw.ccf) <- samples.all[idx.lst]
+
+  # print(plot.trt.series[[2]])
+  # print(plot.raw.ccf[[2]])
+  # print(plot.trt.ccf[[2]])
+  # plot.lst <- list(plot.raw.series, plot.trt.series, plot.raw.ccf, plot.trt.ccf )
+  # plot.lst <- list(plot.raw.series = plot.raw.series, plot.trt.series = plot.trt.series, plot.raw.ccf = plot.raw.ccf, plot.trt.ccf = plot.trt.ccf)
+
+
   # plot.lst <- generate.plots(master.trt, dt.input)
 
 
-    if (!is.null(out.pdf))
-    # Open a PDF device
-    pdf(out.pdf, onefile = TRUE)
+  return(list(plot.raw.series = plot.raw.series, plot.trt.series = plot.trt.series, plot.raw.ccf = plot.raw.ccf, plot.trt.ccf = plot.trt.ccf))
 
 
-    # Loop through the plot lists and arrange them on each page
-    for (i in idx.lst) {
-      # plots <- list(plot.lst$plot.raw.series[[i]], plot.lst$plot.trt.series [[i]], plot.lst$plot.raw.ccf[[i]], plot.lst$plot.trt.ccf[[i]])
-      # grid.arrange(grobs = plots, ncol = 2, nrow = 2)
-    p.i<-  (plot.lst$plot.raw.series[[i]] | plot.lst$plot.trt.series [[i]]) / (plot.lst$plot.raw.ccf[[i]] | plot.lst$plot.trt.ccf[[i]]) +
-        plot_annotation(
-          title = paste0("SampleID: ", samples.all[idx.lst[1]]) ,
-          caption = paste0("Data source: ", caption),
-          tag_levels = 'a',
-          tag_suffix = ")") &
-        theme(
-          plot.title = element_text(face = "bold"),
-          plot.tag = element_text(face = "bold"),
-          plot.caption = element_text(hjust = 0.2, face = "italic" )
-
-          # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
-          )
-    print(p.i)
-    }
-
-  # Close the PDF device
-  if (!is.null(out.pdf)) dev.off()
 }
 
 
+
+#' @keywords internal
+#' @noRd
+#'
+create_plot.series <- function(icol, data) {
+  if (str_detect(deparse(substitute(data)), "trt")) {
+
+    label <- "treated "}else{
+
+      label <- "raw"}
+  sampleID<- names(data)[icol]
+  p <- ggplot(data, aes(x = Year)) +
+    geom_line(aes(y = get(sampleID), color = 'Tree'), na.rm = TRUE) +
+    geom_point(aes(y = get(sampleID), color = 'Tree'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
+    geom_line(aes(y = get(names(data)[2]), color = 'Chron'), na.rm = TRUE) +
+    geom_point(aes(y = get(names(data)[2]), color = 'Chron'), shape = 21, size = 2, fill = "white", na.rm = TRUE) +
+    labs(
+      title = paste(label," ", str_sub(sampleID, 3, -1)),
+      # title = bquote(bold(.(a_d)) ~ .(label) ~ .(str_sub(sampleID, 3))),
+      #
+      x = "Year", y = paste0(label, " rw (mm)"),
+      color = "Series") +
+    theme_minimal()
+  return(p)
+}
+
+
+#' @keywords internal
+#' @noRd
+#'
+create_barplot <- function(icol, data) {
+  sampleID.chr <- names(data)[icol]
+  if (str_detect(deparse(substitute(data)), "trt")) {
+    parts <- str_split_fixed(names(data)[icol], "\\$",3)
+    test <- parts[, 2]
+    lagmax <- as.integer(parts[, 3])
+    sampleID.o <- parts[, 1]
+
+    label <- "treated"
+    dt.clrs <- data.table(lag = -10:10)
+    dt.clrs[, colr:= ifelse(lag == lagmax, "red", "black")]
+    dt.clrs[lag == 0 & colr == 'black', colr:= "blue"]
+    clrs <- setNames(as.character(dt.clrs$colr), as.character(dt.clrs$lag))
+  } else {
+
+    label <- "raw"
+    test <- ""
+    sampleID.o <- str_split_fixed(sampleID.chr, "\\_",2)[,2]
+    dt.clrs <- data.table(lag = -10:10)
+    dt.clrs[, colr:=  "black"]
+    dt.clrs[lag == 0 , colr:= "blue"]
+    clrs <- setNames(as.character(dt.clrs$colr), as.character(dt.clrs$lag))
+  }
+
+
+  # Create the bar plot
+  p <- ggplot(data, aes(x = as.factor(lag), y = get(sampleID.chr), fill = as.factor(lag))) +
+    geom_bar(stat = "identity",na.rm = TRUE) +
+    scale_fill_manual(values = clrs) +
+    # scale_fill_manual(values = clrs) +
+    labs(
+      # title = bquote(bold(.(a_d)) ~ "ccf_" * .(label) ~ .(sampleID.o) ~ .(test)),
+      # title = bquote(bold(.(var)) ~ "ccf" * .(label))
+      title = ifelse(label == "raw", "", paste( " qa_code: ", test)),
+      x = "lag", y = paste0("correlation with ", label, " chronologies"),
+      color = "Series") +
+    ylim(-1, 1) +
+    theme_minimal() +
+    theme(legend.position = "none")
+  return(p)
+}
 
 
 
@@ -74,28 +142,22 @@ plots_qa <- function(plot.lst, out.series = "all", caption = "CFS-TRenD V1.2 sam
 #'
 #' @param dt.freq a table resulting from function CFS_freq()
 #' @param out.species species list, default is 'all' to output all species
-#' @param caption caption of data source
-#' @param out.pdf output file name including path/filename.pdf, default is NULL for screen display
 
 
+#' @export plot_freq
 
-#' @import data.table
-#' @importFrom grDevices dev.off pdf
-
-#' @export plots_freq
-
-plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL ) {
-  uid_label <- str_split(unique(dt.freq$uid_label), "_yr",2)[[1]]
-  if (!is.na(uid_label[2])) title.tmp <- paste0( str_sub(uid_label[1], 5), " distribution by year ",uid_label[2]) else
-    title.tmp <- paste0( str_sub(uid_label[1], 5), " distribution")
+plot_freq <- function(dt.freq, out.species = "all" ) {
+  if (!inherits(dt.freq, "cfs_freq")) stop("please check the input of dt.freq, make sure it's the result of CFS_freq() function")
+  uid_label <- str_split(unique(dt.freq$dist_uids$uid_label), "_yr",2)[[1]]
+  # if (!is.na(uid_label[2])) title.tmp <- paste0( str_sub(uid_label[1], 5), " distribution by year ",uid_label[2]) else
+  #   title.tmp <- paste0( str_sub(uid_label[1], 5), " distribution")
   # print(uid_label)
-  dist.uids <- melt(dt.freq, id.vars = c("uid_label", "species" , "ord", "N", "pct.species" , "lat"),
+  dist.uids <- melt(dt.freq$dist_uids, id.vars = c("uid_label", "species" , "ord", "N", "pct.species" , "lat"),
                   variable.name = "lon",
                   value.name = "nuids")[!is.na(nuids)]
   dist.uids[, lon:= as.numeric(as.character(lon))]
   setorder(dist.uids, ord, lon, lat)
-  if (all(tolower(out.species) == "all")) data.tmp <- dist.uids
-  else{
+  if (all(tolower(out.species) == "all")) data.tmp <- dist.uids else{
 
     data.tmp <- dist.uids[species %in% out.species]
   }
@@ -104,7 +166,7 @@ plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL
 
 
 
-  if (nrow(data.tmp) == 0) stop("cannot find out.series, please verify if they exist in sample.lst")
+  if (nrow(data.tmp) == 0) stop("cannot find qa.out_series, please verify if they exist in sample.lst")
   # plot.lst <- generate.plots(master.trt, dt.input)
 
 
@@ -118,10 +180,7 @@ plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL
   chunks <- split(spc_pcts, ceiling(seq_along(spc_pcts) / 2))
 
 
-  if (!is.null(out.pdf))
-    # Open a PDF device
-    pdf(out.pdf, onefile = TRUE)
-
+plt.lst <- list()
   for (i in seq_along(chunks)) {
     # Subset data for the current chunk
     data.i <- data.tmp[data.tmp$spc.pct %in% chunks[[i]], ]
@@ -138,19 +197,83 @@ plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL
             plot.margin = margin(t = 10, r = 10, b = 30, l = 30, unit = "pt"), # Adjust plot margins
             plot.caption = element_text(hjust = 0, face = "italic")) + # Customize caption appearance
 
-      labs(title = title.tmp,
+      labs(
+        # title = title.tmp,
            x = "Longitude",
            y = "Latitude",
-           caption = paste0("Data source: ", caption) , # Add the data source caption
+           caption = paste0("Data source: ", dt.freq$freq.parms$label_data) , # Add the data source caption
            size = paste0("n.", str_sub(uid_label[1], 5), "s"))
 
-    print(p1)
+    plt.lst[[i]] <- p1
 
   }
 
-  # Close the PDF device
-  if (!is.null(out.pdf)) dev.off()
+return(plt.lst)
 }
+
+
+
+#' plot rw_median of the site and its neighbours on temperoral and spatial space
+#' @description
+#' This function plots rw_median of the site and its neighbours on temperoral and spatial space
+#'
+#' @param dt.scale a table resulting from function CFS_scale()
+
+
+
+
+
+#' @export plot_scale
+
+plot_scale <- function(dt.scale){
+  check_optional_deps()
+  if (!inherits(dt.scale, "cfs_scale")) stop("please check the input of dt.scale, make sure it's the result of CFS_scale() function")
+  g1 <- ggplot(dt.scale$dt.plots[[1]], aes(x = year, y = rw.median, group = uid_site)) +
+
+    geom_line(aes(color = factor(ifelse(ord == 0, "Red group", "Blue group"))),
+              alpha = 0.6, size = 1) +
+
+    scale_color_manual(values = c("Red group" = "red", "Blue group" = "darkblue"),
+                       labels = c("Red group" = "target", "Blue group" = "neigh."),
+                       name = "") +
+    theme_minimal() +
+    theme(legend.position = "right",
+          plot.caption = element_text(hjust = 0, face = "italic")) +  # Position the legend on the right
+
+    labs(
+      y = "rw.median (mm)"
+
+    )
+
+
+  g2 <- ggplot(dt.scale$dt.plots[[2]], aes(x = longitude, y = latitude, size = rw.median)) +
+    geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")), alpha = 1) +
+    scale_color_identity() +
+    scale_size_continuous(
+      name = "rw median (mm)"
+    ) +
+    guides(size = guide_legend(override.aes = list(color = "darkblue"))) +
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3), expand = expansion(mult = 0.3)) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 5), expand = expansion(mult = 0.2)) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(size = 16),
+      panel.grid.minor = element_blank(),
+      plot.title = element_text(size = 18),
+      legend.text = element_text(color = "darkblue"),
+      legend.title = element_text(color = "darkblue")
+    ) +
+    labs(
+      x = "Longitude",
+      y = "Latitude"
+    )
+
+
+  return(list(plot.year = g1, plot.ll = g2))
+
+}
+
+
 
 
 #' plot data summary and location
@@ -159,44 +282,17 @@ plots_freq <- function(dt.freq, out.species = "all", caption = "", out.pdf= NULL
 #'
 #' @param data a list of 2 tables : 1st is meta data with 1 species only ; 2nd is the ring width measurement in long-format
 
+#' @keywords internal
+#' @noRd
 
-#' @import patchwork
-#' @import ggplot2
-#' @import sf
-
-#' @export plots_ds
-
-plots_ds <- function(data){
+plot_ds <- function(data){
+  check_optional_deps()
   dt.tr <- data[[1]]
   dt.rw <- data[[2]]
   spc <- unique(dt.tr$species)
-  # if (nrow(dt.tr[!is.na(dbh_cm)]) > 0)
-  #   p.dbh <- ggplot(dt.tr[!is.na(dbh_cm), .N, by = c("dbh_cm", "uid_tree", "species")], aes(x = dbh_cm)) +
-  #   geom_histogram(binwidth = 5, color = "black", fill = "blue") +
-  #   labs(title = "dbh (cm)", x = "dbh (cm)", y = "Frequency") +
-  #   theme_classic() else p.dbh <- ggplot() + labs(title = "dbh frequency (no data)") +
-  #   theme_minimal() +  # Use a minimal theme as a starting point
-  #   theme(
-  #     panel.background = element_rect(fill = "transparent", color = NA),  # Transparent panel
-  #     plot.background = element_rect(fill = "transparent", color = NA)   # Transparent plot area
-  #   )
-  #
-  # if (nrow(dt.tr[!is.na(ht_tot_m)]) > 0)
-  #   p.ht <- ggplot(dt.tr[!is.na(ht_tot_m), .N, by = c("ht_tot_m", "uid_tree", "species")], aes(x = ht_tot_m)) +
-  #   geom_histogram(binwidth = 5, color = "black", fill = "yellow") +
-  #   labs(title = "height (m) ", x = "height (m)", y = "Frequency") +
-  #   theme_classic() else p.ht <- ggplot() + labs(title = "height frequency (no data)") +
-  #   theme_minimal() +  # Use a minimal theme as a starting point
-  #   theme(
-  #     panel.background = element_rect(fill = "transparent", color = NA),  # Transparent panel
-  #     plot.background = element_rect(fill = "transparent", color = NA)   # Transparent plot area
-  #   )
 
-  # p.yr <- ggplot(dt.rw, aes(x = year)) +
-  #   geom_bar(fill = "lightgrey", color = "lightblue") +
-  #   labs(title = paste0("year frequency (max: ", nrow(tr_w6), ")"), x = "Year", y = "") +
-  #   theme_minimal()
-  #
+  # shp <- st_read(system.file("extdata", "Mapping", "province.shp", package = "CFSTRenD"))
+  # canada_lcc <- st_transform(shp, crs = 3347)
   p.rw_hist <- ggplot(dt.rw, aes(x = rw_mm)) +
     geom_histogram(binwidth = 1, color = "black", fill =  "lightgreen") +
     labs(title = "ring width", x = "ring width (mm)", y = "Frequency") +
@@ -210,9 +306,10 @@ plots_ds <- function(data){
 
     tmp <- dt.tr[, .N, by = .(longitude, latitude)]
   pts <- tmp %>%
-    st_as_sf(coords = c("longitude", "latitude"), crs = "+proj=longlat +datum=WGS84") %>%
-    st_cast("POINT")
+    sf::st_as_sf(coords = c("longitude", "latitude"), crs = "+proj=longlat +datum=WGS84") %>%
+    sf::st_cast("POINT")
 
+  # shp file in sysdata.rda
   p.loc <- ggplot() +
     geom_sf(data = shp, fill = NA, color = "lightgrey", alpha = 0) + # Polygons
     geom_sf(data = pts, color = "blue", size = 2) +          # Points
@@ -233,12 +330,57 @@ plots_ds <- function(data){
       axis.title = element_blank()
     )
 
-  p.rw <- ggplot(dt.rw, aes(x = year, y = rw_mm)) +
-    geom_point(color = "lightgrey") +
-    labs(title = "ring width(mm) ", y = "ring width (mm)", x = "year") +
-    theme_classic()
+  # p.rw <- ggplot(dt.rw, aes(x = year, y = rw_mm)) +
+  #   geom_point(color = "lightgrey") +
+  #   labs(title = "ring width(mm) ", y = "ring width (mm)", x = "year") +
+  #   theme_classic()
 
-  p.ispc<-  (p.loc | p.rw)/ (p.age | p.rw_hist) +
+  # Compute equal-width breaks
+  breaks_lat <- seq(min(dt.tr$latitude), max(dt.tr$latitude), length.out = 4)
+
+  # Midpoints of the intervals
+  mids_lat <- utils::head(breaks_lat, -1) + diff(breaks_lat)/2
+
+  # Assign each value the midpoint of its class
+  dt.tr[, lat := mids_lat[cut(latitude, breaks = breaks_lat, include.lowest = TRUE, labels = FALSE)]]
+
+
+  # Compute equal-width breaks
+  breaks_lon <- seq(min(dt.tr$longitude), max(dt.tr$longitude), length.out = 4)
+
+  # Midpoints of the intervals
+  mids_lon <- utils::head(breaks_lon, -1) + diff(breaks_lon)/2
+
+  # Assign each value the midpoint of its class
+  dt.tr[, lon := mids_lon[cut(longitude, breaks = breaks_lon, include.lowest = TRUE, labels = FALSE)]]
+
+
+  dist.uids <- dt.tr[, .(nuids = .N), by = .(lat, lon)]
+  # dist.uids[, ord:= 1]
+  # setorder(dist.uids, ord, lon, lat)
+  setorder(dist.uids, lon, lat)
+  p.freq <- ggplot(dist.uids, aes(x = lon, y = lat, size = nuids))  +
+    geom_point(alpha = 0.6, color = "darkblue") +
+
+    scale_x_continuous(expand = expansion(mult = 0.1)) +
+    scale_y_continuous(expand = expansion(mult = 0.1)) +
+
+
+    theme_minimal() +
+  # +
+    # theme(strip.text = element_text(size = 16),# Increase the size of facet labels
+          # panel.grid.minor = element_blank() , # Remove minor grid lines
+          # plot.title = element_text(size = 25), # Set title size
+          # plot.margin = margin(t = 10, r = 10, b = 30, l = 30, unit = "pt"), # Adjust plot margins
+          # plot.caption = element_text(hjust = 0, face = "italic")) + # Customize caption appearance
+
+    labs(
+      title = "Count by Location",
+      x = "Longitude",
+      y = "Latitude",
+      size = paste0("N.series"))
+
+  p.ispc<-  (p.loc | p.freq)/ (p.age | p.rw_hist) +
     plot_annotation(
       title = paste0("Species: ", spc) ,
       tag_levels = 'a',
@@ -264,14 +406,10 @@ plots_ds <- function(data){
 #' @param nrow number of plots per row
 #' @param ncol number of plots per col
 
-
-#' @import ggforce
-#' @import ggplot2
-
-
-#' @export plots_facet
-
-plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
+#' @keywords internal
+#' @noRd
+plot_facet <- function(data, varcols, xylabels, nrow, ncol) {
+  check_optional_deps()
   # Calculate the total number of pages
   # print(paste0(nrow, " ", ncol))
   total_pages <- ceiling(length(unique(data[[varcols[[3]]]])) / (nrow*ncol))
@@ -279,9 +417,11 @@ plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
 
   # Generate plots for each page
   plot_list <- lapply(1:total_pages, function(page) {
+
+
     ggplot(data, aes(x = .data[[varcols[[1]]]], y = .data[[varcols[[2]]]])) +
       geom_point(color = "lightgrey") +
-      facet_wrap_paginate(
+      ggforce::facet_wrap_paginate(
         ~.data[[varcols[[3]]]],
         ncol = ncol,
         nrow = nrow,
@@ -306,44 +446,6 @@ plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
 }
 
 
-#' Generate a data/model Report
-#'
-#' This function generates an HTML data report using an R Markdown template.
-#' @param robj an r object, either a list of data tables running from CFS_format()  or a list running from gamm_series, gamm_site, gamm_spatial or bam_spatial
-#' @param usage for data report, 1 for data submission, hence the complete report; 2 for modelling use, simplified report. It has no effect on model report.
-#' @param output_file A string specifying the name of the output HTML file.
-#'
-#' @return An HTML file containing the data report.
-#' @export generate_report
-#
-# generate_report <- function(robj, reports.sel = c(1,2,3,4), label_trt = "differentiated", parms.qa = c(min.nseries.qa = 20, N.nbs.qa = 6), output_file = NULL) {
-#   # if (!input[[1]] %in% c("data", "model")) stop("the first item needs to be data or model")
-#   # robj <- input[[2]]
-#   if ( "data.frame" %in% class(robj$tr_all_wide) | "data.table" %in% class(robj$tr_all_wide)) type.templt <- "data" else {
-#     if ( "list" %in% class(robj) & !is.null(robj$model)) type.templt <- "model"
-#   }
-#   # Path to the R Markdown template
-#   rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
-#   # rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst/rmd", paste0(type.templt,"_report_template.Rmd"))
-#
-#
-#                           # Check if the template exists
-#                           if (rmd_file == "") {
-#                             stop("Template not found! Ensure 'data_report_template.Rmd' is in inst/rmd/ directory.")
-#                           }
-#
-#                           # Render the report
-#                           if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(input = rmd_file,
-#                                                                                                       params = list(robj = robj, usage = usage))) else
-#
-#                             rmarkdown::render(
-#                               input = rmd_file,
-#                               output_file = output_file,
-#                               params = list(robj = robj, reports.sel =reports.sel, label_trt = label_trt, parms.qa = parms.qa),
-#                               envir = new.env(parent = globalenv()) # Isolate environment
-#                             )
-# }
-#
 
 # generate_vignette <- function(output_file = NULL) {
 #
@@ -365,3 +467,314 @@ plots_facet <- function(data, varcols, xylabels, nrow, ncol) {
 #       envir = new.env(parent = globalenv()) # Isolate environment
 #     )
 # }
+
+
+
+#' Generate Automated Reports from CFSTRenD Objects
+#'
+#' Creates HTML reports from various CFSTRenD analysis objects using predefined
+#' R Markdown templates. The function automatically selects the appropriate template
+#' based on the input object's class and renders a comprehensive report with
+#' visualizations and analysis results.
+#'
+#' @param robj An R object containing analysis results from CFSTRenD functions.
+#'   The object's class determines which report template is used. Supported
+#'   classes depend on available templates in the package.
+#' @param data_report.reports_sel Numeric vector. Specifies which report sections
+#'   to include in the output. Default is c(1,2,3,4) to include all sections.
+#'   The meaning of each number depends on the specific template being used.
+#' @param output_file Character string. Optional path and filename for the output
+#'   HTML file. If NULL (default), the report is generated with an automatic
+#'   filename and opened in RStudio viewer.
+#' @param ... Additional parameters passed to the R Markdown template. Available
+#'   parameters vary by template type and are filtered to only include those
+#'   recognized by the selected template.
+#'
+#' @return Character string. The file path of the generated HTML report.
+#'   As a side effect, if output_file is NULL, opens the report in RStudio viewer.
+#'
+#' @details
+#' The function works through the following process:
+#' \itemize{
+#'   \item Determines the object class and selects corresponding template
+#'   \item Validates that a template exists for the given object type
+#'   \item Merges user-provided parameters with base parameters
+#'   \item Filters parameters to only those accepted by the template
+#'   \item Renders the R Markdown template with the specified parameters
+#'   \item Opens the result in RStudio viewer (if no output file specified)
+#' }
+#'
+#' @section Template System:
+#' The function uses a template system where:
+#' \itemize{
+#'   \item Templates are stored in \code{inst/rmd/} directory
+#'   \item Template selection is based on \code{get_template_and_params()}
+#'   \item Each template has defined parameters it accepts
+#'   \item Template files follow naming convention: \code{template_[type].Rmd}
+#' }
+#'
+#' @section Report Sections:
+#' The \code{data_report.reports_sel} parameter controls which sections appear
+#' in the final report. Section numbers and their meanings are template-specific.
+#' Common patterns include:
+#' \itemize{
+#'   \item 1: Summary statistics and data overview
+#'   \item 2: Main analysis results and visualizations
+#'   \item 3: Detailed breakdowns or secondary analyses
+#'   \item 4: Appendices or supplementary information
+#' }
+#'
+#'
+#' @examples
+#' \dontrun{
+#' # Generate default report for a CFSTRenD analysis object
+#' my_results <- some_cfstrend_function(data)
+#' generate_report.a(my_results)
+#'
+#' # Generate report with specific sections only
+#' generate_report.a(my_results, data_report.reports_sel = c(1, 3))
+#'
+#' # Save report to specific file with custom parameters
+#' generate_report.a(my_results,
+#'                   data_report.reports_sel = c(1, 2, 4),
+#'                   output_file = "my_analysis_report.html",
+#'                   custom_title = "Forest Analysis Results",
+#'                   include_maps = TRUE)
+#'
+#' # Generate report with additional template parameters
+#' generate_report.a(my_results,
+#'                   output_file = "detailed_report.html",
+#'                   animation_fps = 2.0,
+#'                   color_scheme = "viridis")
+#' }
+#'
+#' @note
+#' This function requires that appropriate R Markdown templates exist in the
+#' package's \code{inst/rmd/} directory. Templates must be named following
+#' the convention \code{template_[type].Rmd} where [type] corresponds to the
+#' object class or template identifier returned by \code{get_template_and_params()}.
+#'
+
+#' @export
+generate_report <- function(robj, data_report.reports_sel = c(1,2,3,4), output_file = NULL, ...) {
+
+  check_optional_deps()
+  robj_class <- class(robj)[1]
+  tpl_info <- get_template_and_params(robj_class)
+
+  if (tpl_info$template == "unknown") {
+    stop("No report template defined for class ", robj_class)
+  }
+
+  # Path to the Rmd template
+  # rmd_file <- system.file("reports", paste0(tpl_info$template, ".Rmd"), package = "myPackage")
+
+  # Collect all parameters passed by user
+  user_params <- list(...)
+
+  # Base params always include the object itself
+  base_params <- list(robj = robj, data_report.reports_sel = data_report.reports_sel)
+
+  # Merge user params into base
+  all_params <- utils::modifyList(base_params, user_params)
+
+  # Filter params only to those allowed by the template
+  final_params <- all_params[names(all_params) %in% tpl_info$params]
+
+  # print(type.templt)
+  # if (type.templt == "unknown") stop("The input is not supported by this procedure, please check...") else
+  # Path to the R Markdown template
+   # rmd_file <- file.path("C:/Users/xjguo/Documents/Rpackages/CFSTRenD/inst/rmd", paste0("template_", tpl_info$template, ".Rmd"))
+  rmd_file <- system.file("rmd", paste0("template_", tpl_info$template, ".Rmd"), package = "CFSTRenD" )
+
+
+  # Check if the template exists
+  if (rmd_file == "") {
+    stop(paste0("Template not found! Ensure ", paste0("template_", tpl_info$template, ".Rmd"),  "is in inst/rmd/ directory."))
+  }
+
+
+  result <- rmarkdown::render(
+    input = rmd_file,
+    output_file = output_file,
+    params = final_params,
+    envir = new.env(parent = globalenv())
+  )
+
+  if (is.null(output_file)) {
+    rstudioapi::viewer(result)
+  }
+
+  return(invisible(result))
+}
+
+
+#' @keywords internal
+#' @noRd
+#'
+get_template_and_params <- function(robj_class) {
+  class_to_template <- c(
+    cfs_model = "model_report",
+    cfs_format = "data_report",
+    cfs_scale_list = "scale",
+    cfs_freq = "freq",
+    cfs_qa = "qa",
+    cfs_gif = "gif"
+  )
+
+  template_params <- list(
+    model_report = c("robj", "param1", "param2"),
+    data_report  = c("robj","data_report.reports_sel", "qa.min_nseries", "qa.label_data", "qa.label_trt", "scale.N_nbs"),
+    scale        = c("robj"),
+    freq         = c("robj", "freq.out_species"),
+    qa           = c("robj", "qa.out_series"),
+    gif          = c("robj", "animation_fps", "data.crs", "png.text", "rmd_output")
+  )
+
+  template_name <- class_to_template[[robj_class]]
+  if (is.null(template_name)) template_name <- "unknown"
+
+  allowed_params <- template_params[[template_name]]
+
+  list(template = template_name, params = allowed_params)
+}
+
+#' Plot GAM smooth terms with confidence intervals
+#'
+#' This function generates ggplot objects for each smooth term in a GAM model.
+#' Predictions vary one smooth term at a time, keeping all other terms fixed at reference values.
+#' Confidence intervals are computed using \code{ci_resp()}, supporting multiple methods:
+#' "delta_link", "delta_resp", "bootstrap_link", "bootstrap_resp", and "posterior".
+#' Small samples automatically trigger the "posterior" method for more robust CIs.
+#'
+#' @param robj R object from the modelling functions.
+#' @param ... Additional arguments passed to \code{ci_resp()}.
+#'
+#' @return A list of ggplot objects, one per smooth term.
+#'
+#' @examples
+#' \dontrun{
+#' library(mgcv)
+#' dat <- gamSim(1, n = 200, dist = "normal")
+#' m <- gam_mod(data = dat, m.candidates = "y ~ s(x0) + s(x1)", resp_scale = "resp_gaussian")
+#' plots <- plot_resp(robj = m, ci_method = "posterior", nboot = 500)
+#' }
+#'
+
+#' @export
+plot_resp <- function(robj, ...) {
+  check_optional_deps()
+  if (is.list(robj$model) && all(c("gam", "lme") %in% names(robj$model))) model <- robj$model$gam else model <- robj$model
+
+  model_data <- model$model  # original data
+
+  # remove matrix
+  model_data <- as.data.frame(model_data)[ , !sapply(model_data, is.matrix), drop = FALSE]
+  model_data <- as.data.frame(model_data)[ , !sapply(model_data, is.list), drop = FALSE]
+
+  resp_scale <- robj$model$resp_scale
+  if (length(resp_scale) == 0 )stop("cannot identify response variable scale")
+  is_log_model <- resp_scale %in% c("resp_gamma", "resp_log")
+
+  if (length(is_log_model) == 0 )stop("cannot identify response variable scale")
+  # pass is_log_model to gam object for ci_resp
+model$is_log_model <- is_log_model
+model$resp_scale <- resp_scale
+  # Extract smooth terms
+  dt.vars <- data.table::rbindlist(lapply(model$smooth, function(sm) {
+    data.table(
+      form     = sm$label,
+      variable = sm$term[1],
+      byterm   = if (sm$by == "NA") NA_character_ else sm$by
+    )
+  }))
+  dt.vars <- dt.vars[, .N, by = .(variable, byterm)][, N := NULL]
+  dt.vars[, term := ifelse(is.na(byterm), variable, paste0(variable, "_by_", byterm))]
+  setDT(model_data)
+  # Response variable
+  response_var <- all.vars(formula(model))[1]
+  if (is_log_model == TRUE) {
+    response_var <- gsub("^log\\(|\\)$", "", response_var)
+
+    model_data$y.resp <- exp(model_data[[names(model_data)[1]]])} else{
+
+      model_data$y.resp <- model_data[[names(model_data)[1]]]
+    }
+  all.vars(formula(model))[1]
+  # names(model$model)
+  # Generate plots for each smooth term
+  p_list <- lapply(seq_len(nrow(dt.vars)), function(i.var) {
+
+    var <- dt.vars[i.var, ]$variable
+    byterm <- dt.vars[i.var, ]$byterm
+    term_name <- dt.vars[i.var, ]$term
+
+    if (!var %in% names(model_data)) return(NULL)
+    if (!is.na(byterm) && !byterm %in% names(model_data)) return(NULL)
+
+    terms_to_predict <- if (!is.na(byterm)) c(var, byterm) else var
+
+    # Generate newdata grid using ggpredict (others fixed)
+
+
+
+      nd <- ggeffects::data_grid(model, terms_to_predict)
+
+    setDT(nd)
+    nd[,x:=get(var)]
+    if (!is.na(byterm)){
+      ranges <- model_data[, .(minv = min(get(var), na.rm = TRUE),
+                               maxv = max(get(var), na.rm = TRUE)),
+                           by = byterm]
+      nd <- merge(nd, ranges, by = byterm)
+
+      nd[, group:=get(byterm)]
+      nd <-nd[x >= minv & x <= maxv]
+    }
+
+
+    # nd$is_log_model <- is_log_model
+
+
+    # Compute CI using ci_resp()
+    dt.pred <- ci_resp(model, newdata = nd)
+
+    # Combine predictions and CI
+    # dt.pred <- cbind(nd, ci_dt)
+
+    # Plot
+    p <- ggplot()
+    if (!is.null(byterm) & !is.na(byterm) ) {
+      p <- p +
+        geom_line(data = dt.pred, aes(x = x, y = fit, color = group), linewidth = 1) +
+        geom_ribbon(data = dt.pred, aes(x = x, ymin = lwr, ymax = upr, fill = group),
+                    alpha = 0.1, show.legend = FALSE) +
+        geom_point(data = model_data, aes(x = !!sym(var),
+                                          y = y.resp,
+                                          color = !!sym(byterm)), alpha = 0.6, size = 1)
+
+
+
+    } else {
+      p <- p +
+        geom_line(data = dt.pred, aes(x = x, y = fit), color = "steelblue", linewidth = 1) +
+        geom_ribbon(data = dt.pred, aes(x = x, ymin = lwr, ymax = upr), fill = "steelblue", alpha = 0.1) +
+        geom_point(data = model_data, aes(x = !!sym(var),
+                                          y = y.resp),
+                   alpha = 0.6, size = 1, color = "gray30")
+    }
+
+
+    # ci_subtitle <- paste("CI method:", unique(dt.pred$ci_method))
+
+    p <- p +
+      labs(x = var, y = response_var, title = term_name, subtitle = paste("CI method:", unique(dt.pred$ci_method)),
+           color = byterm) +
+      theme_minimal()
+
+    return(p)
+  })
+
+  return(p_list)
+}
+

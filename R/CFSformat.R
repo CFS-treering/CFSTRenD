@@ -11,10 +11,6 @@
 #'
 #' @references Girardin, M.P., Guo, X.J., Metsaranta, J., Gervais, D., Campbell, E., Arsenault, A., Isaac-Rentone, M., Harvey, J.E., Bhatti, J., Hogg, E.A. 2021. A national tree-ring repository for Canadian forests (CFS-TRenD): structure, synthesis and applications. Environmental Reviews, 29 (999), 1-17. https://doi.org/10.1139/er-2020-0099
 
-#'
-#' @import data.table
-#' @import stringr
-#'
 #' @return A list of 3 elements:
 #' 1) A list containing seven tables compatible with CFS-TRenD data structure;
 #' 2) A data table containing all the meta-data and ring width measurement in wide format;
@@ -182,8 +178,8 @@ if (all(c("latitude", "longitutde") %in% names(dt.new))){
 
   ys <- dt.rwl[, .(rw_ystart = min(year), rw_yend = max(year)), by = c("uid_radius.tmp")]
   setorder(dt.rwl, uid_radius.tmp, year)
-  dt.rwl[, ydif:= year - shift(year), by = "uid_radius.tmp"]
-  dt.rwl[, rwinc:= rw_mm - shift(rw_mm), by = "uid_radius.tmp"]
+  dt.rwl[, ydif:= year - data.table::shift(year), by = "uid_radius.tmp"]
+  dt.rwl[, rwinc:= rw_mm - data.table::shift(rw_mm), by = "uid_radius.tmp"]
   chk.ydif <- dt.rwl[, .SD[-1], by = uid_radius.tmp][is.na(ydif)][, .N, by = .(radius_id)]
   if (nrow(chk.ydif) > 0) stop(paste0("radius_id: ", paste(chk.ydif$radius_id, collapse = ", "), " with missing year, please verify..." ))
   # str(dt.rwl)
@@ -245,11 +241,11 @@ if (all(c("latitude", "longitutde") %in% names(dt.new))){
       if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
 
       for (i.tbl in 1:7){
-        write.csv(eval(parse(text = fn7[i.tbl])), file =file.path(out.csv, paste0(fn7[i.tbl], ".csv" )), na = "",  row.names = FALSE)
+        utils::write.csv(eval(parse(text = fn7[i.tbl])), file =file.path(out.csv, paste0(fn7[i.tbl], ".csv" )), na = "",  row.names = FALSE)
 
       }
-      write.csv(tr_all_wide, file =file.path(out.csv, paste0("tr_all_wide", ".csv" )), na = "",  row.names = FALSE)
-      write.csv(complete_vars, file =file.path(out.csv, paste0("complete_vars", ".csv" )), na = "",  row.names = FALSE)
+      utils::write.csv(tr_all_wide, file =file.path(out.csv, paste0("tr_all_wide", ".csv" )), na = "",  row.names = FALSE)
+      utils::write.csv(complete_vars, file =file.path(out.csv, paste0("complete_vars", ".csv" )), na = "",  row.names = FALSE)
 
 
       }
@@ -262,163 +258,33 @@ if (all(c("latitude", "longitutde") %in% names(dt.new))){
 }
 
 
-#' compare the median of tree ring measurement of a specific site to those of nearby sites
-#' @description
-#' Apply a k-nearest neighbors (k-NN) method based on geographic location for the same species.
-#' It compares the median tree-ring measurements of a specific site to those of nearby sites
-#'
-#' @param site2chk  data.table with columns uid_site, site_id, species, longitude and latitude
-#' @param ref_sites  reference sites including species, uid_site, latitude, longitude, uid_radius, year, rw_mm in long format
-#' @param max.dist_km maximum distance to search the neighbors in km
-#' @param N.nbs  number of nearest-neighbors (maximum)
-#' @param make.plot  a list , first item for plot figures or not, second item for the caption of data source
-#'
-#' @import data.table
-#' @import stringr
-#' @import geosphere
-#' @importFrom scales pretty_breaks
-#' @import patchwork
-#'
-#' @return A data table containing the median ring-width measurements of the involved sites, along with the distances from the specific site
-
-#' @export CFS_scale
-#'
-
-#'
-
-CFS_scale <- function(site2chk, ref_sites, max.dist_km = 20, N.nbs = 10, make.plot = c(FALSE, "")){
-  # scale
-  if (nrow(site2chk) > 1) stop("we can only process 1 species in 1 site each time ...")
-
-  # check key columns
-  if (length(setdiff(c("species", "uid_site", "latitude","longitude"), names(site2chk))) > 0) stop("at least one of the mandatory columns (species, uid_site, latitude, longitude) doesn't exist, please check...")
-  if (length(setdiff(c("species", "uid_site", "uid_radius","year", "rw_mm"), names(ref_sites))) > 0) stop("at least one of the mandatory columns (species, uid_site, latitude, longitude, uid_radius, year, rw_mm) doesn't exist, please check...")
-
-
-  site.all.spc <- ref_sites[species == site2chk$species, .N, by = .(uid_site, species, latitude, longitude)]
-  dist.mat <- distm(site2chk[, c("longitude", "latitude")],
-                    site.all.spc[, c("longitude", "latitude")],
-                    fun = distGeo)
-  site.all.spc$dist_to_chk_m <- as.vector(t(dist.mat))
-
-  site.all.spc$dist_to_chk_km <- round(site.all.spc$dist_to_chk_m / 1000, 1)
-  setorder(site.all.spc, dist_to_chk_m)
-  site.all.spc$ord <- 0: (nrow(site.all.spc) - 1)
-  site.closest <- site.all.spc[ dist_to_chk_km <= max.dist_km & ord <= N.nbs]
-
-  rw.closest <- merge(ref_sites, site.closest[ , c("ord", "uid_site")], by = c("uid_site"))
-
-
-
-  med.site <- rw.closest[, .(N = .N, rw.median = median(rw_mm), yr.mn = min(year), yr.max = max(year)), by = .(ord, species, uid_site, uid_radius)][,
-    .(Ncores = .N, rw.median = round(median(rw.median), 2), yr.mn = min(yr.mn), yr.max = max(yr.max)), by = .(ord, species, uid_site)]
-
-  med.site.yr <- rw.closest[, .(N = .N, rw.median = median(rw_mm) ), by = .(ord, species, uid_site, uid_radius, year)][,
-    .(Ncores = .N, rw.median = median(rw.median)), by = .(ord, species, uid_site, year)]
-
-  setorder(med.site.yr, ord, uid_site, year)
-  # ratio defines as site2chk/neighbor , when it's smaller means the site2chk's magnitude is smaller,
-  med.site$rw.ratio <- round(med.site[ord == 0]$rw.median/med.site$rw.median,2)
-
-  med.site$size_class <- cut(
-    med.site$rw.ratio,
-    breaks = c(-Inf, 0.1, 0.2, 0.5, 2, 5, 10, Inf), # Define the breaks
-    labels = c("< 0.1", "0.1 - 0.2", "0.2 - 0.5", "0.5 - 2", "2 - 5", "5 - 10", "> 10"), # Define labels
-    include.lowest = TRUE
-  )
-  if (any(is.na(med.site$size_class))) {
-    warning("Some values in rw.ratio are outside the defined breaks and will be excluded.")
-  }
-
-
-
-
-  rw.median <- data.table(med.site[ord == 0][,c( "uid_site","species", "rw.median")],
-                          med.site[ord > 0][, .(N.nbs = .N, rw.min.nbs = min(rw.median), rw.max.nbs = max(rw.median), rw.median.nbs = median(rw.median))])[,ratio_median := round(rw.median/rw.median.nbs,2)]
-
-
-  if (make.plot[1] == TRUE){
-  g2 <- ggplot(med.site.yr, aes(x = year, y = rw.median, group = uid_site)) +
-    geom_line(aes(color = factor(ifelse(ord == 0, "red", "darkblue"))), alpha = 0.6) +
-    scale_color_manual(values = c("red" = "red", "darkblue" = "darkblue"),
-                       labels = c("red" = "Site", "darkblue" = "Nbs"),
-                       name = "") +
-    theme(legend.position = "right",
-          plot.caption = element_text(hjust = 0, face = "italic")) +  # Position the legend on the right
-
-    labs(
-            y = "rw.median (mm)"
-
-    )
-
-
-  g1 <- ggplot(chk.site, aes(x = longitude, y = latitude, size = size_class)) +
-    geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")), alpha = 1) +
-    scale_color_identity() + # Use the actual colors
-    scale_size_manual(
-      values = c("< 0.1" = 1, "0.1 - 0.2" = 2, "0.2 - 0.5" = 3, "0.5 - 2" = 5, "2 - 5" = 7, "5 - 10" = 9, "> 10" = 11), # Map size classes to point sizes
-      name = "ratio(./nb)"
-    ) +
-    scale_x_continuous(breaks = pretty_breaks(n = 3), expand = expansion(mult = 0.3)) +
-    scale_y_continuous(breaks = pretty_breaks(n = 5), expand = expansion(mult = 0.2)) +
-    theme_minimal() +
-    theme(
-      strip.text = element_text(size = 16), # Increase the size of facet labels
-      panel.grid.minor = element_blank(), # Remove minor grid lines
-      plot.title = element_text(size = 18) # Set title size
-    ) +
-    labs(
-      x = "Longitude",
-      y = "Latitude"
-    )
-
-
-  print(g2 + g1 + plot_layout(widths = c(1.2, 1)) +
-          plot_annotation(
-            title = paste0( "uid_site ", site2chk$uid_site, " and its ", N.nbs, " neighbors ( species: ", site2chk$species, ")"  ),
-            caption = paste0("Data source: ", make.plot[2]),
-            tag_levels = 'a',
-            tag_suffix = ")") &
-          theme(
-            plot.title = element_text(face = "bold"),
-            plot.tag = element_text(face = "bold"),
-            plot.caption = element_text(hjust = 0.2, vjust = -1, face = "italic" )
-
-            # plot.margin = margin(t = 10, r = 10, b = 30, unit = "pt") # Adjust plot margins
-            ))
-  }
-
-  result <- list(chk.site = med.site, ratio.median = rw.median)
-  class(result) <- "cfs_scale"
-  return()
-}
-
 
 #' frequency distributions by geo-location per species
 #'
 #' @param tr_meta   meta table from function CFS_format()
-#' @param uid_level which uid level to count(uid_project, uid_site, uid_tree, uid_meas, uid_sample, uid_radius)
-#' @param cutoff_yr cut-off year for a subset which series were recorded on or after
-#' @param geo_resolution resolution of longitude and latitude in degree, default: c(5,5)
+#' @param freq.label_data description of tr_meta
+#' @param freq.uid_level which uid level to count(uid_project, uid_site, uid_tree, uid_meas, uid_sample, uid_radius)
+#' @param freq.cutoff_year cut-off year for a subset which series were recorded on or after
+#' @param freq.geo_resolution resolution of longitude and latitude in degree, default: c(5,5)
 
-
-#' @import data.table
-#' @import stringr
-#' @import ggplot2
-#'
 #' @return a data table of counts of uid by latitude-longitude per species
 #' @export CFS_freq
 #'
 
-CFS_freq <- function(tr_meta,  uid_level, cutoff_yr = -999,geo_resolution = c(5,5)){
-  if (!(uid_level %in% c("uid_project", "uid_site", "uid_tree", "uid_meas", "uid_sample", "uid_radius"))) stop("uid_level should be in c('uid_project', 'uid_site', 'uid_tree', 'uid_meas', 'uid_sample', 'uid_radius')")
+CFS_freq <- function(tr_meta, freq.label_data = "", freq.uid_level = "uid_radius", freq.cutoff_year = -999,freq.geo_resolution = NULL){
+  if (!(freq.uid_level %in% c("uid_project", "uid_site", "uid_tree", "uid_meas", "uid_sample", "uid_radius"))) stop("freq.uid_level should be in c('uid_project', 'uid_site', 'uid_tree', 'uid_meas', 'uid_sample', 'uid_radius')")
 
 
-  dt.meta.sel <- tr_meta[rw_yend >= cutoff_yr, c(unique(c("uid_radius", uid_level)), "longitude", "latitude",  "species"), with = FALSE]
-  dt.meta.sel[,lon:=round(longitude/geo_resolution[1], 0)*geo_resolution[1]]
-  dt.meta.sel[, lat:= round(latitude/geo_resolution[2], 0)*geo_resolution[2]]
+  dt.meta.sel <- tr_meta[rw_yend >= freq.cutoff_year, c(unique(c("uid_radius", freq.uid_level)), "longitude", "latitude",  "species"), with = FALSE]
 
-  uids.sll <- dt.meta.sel[, .N, by = c("lat", "lon", "species", uid_level)][,N:= NULL]
+  if (is.null(freq.geo_resolution) ) {
+    freq.geo_resolution[1] <- (max(tr_meta$longitude) - min(tr_meta$longitude))/4
+    freq.geo_resolution[2] <- (max(tr_meta$latitude) - min(tr_meta$latitude))/4
+  }
+  dt.meta.sel[,lon:=round(longitude/freq.geo_resolution[1], 0)*freq.geo_resolution[1]]
+  dt.meta.sel[, lat:= round(latitude/freq.geo_resolution[2], 0)*freq.geo_resolution[2]]
+
+  uids.sll <- dt.meta.sel[, .N, by = c("lat", "lon", "species", freq.uid_level)][,N:= NULL]
   uids.spc <- uids.sll[,.N, by = .(species)]
   setorder(uids.spc, -N)
   uids.spc[, pct.species := N/sum(N)]
@@ -430,12 +296,14 @@ CFS_freq <- function(tr_meta,  uid_level, cutoff_yr = -999,geo_resolution = c(5,
 
 
   dist_uids <- dcast(dist_uids, ord + species + N + pct.species + lat ~ lon, value.var = "nuids")
-  if (cutoff_yr > 0) dist_uids <- data.table(uid_label = paste0(uid_level, "_yr", cutoff_yr), dist_uids) else
-    dist_uids <- data.table(uid_label = uid_level, dist_uids)
+  if (freq.cutoff_year > 0) dist_uids <- data.table(uid_label = paste0(freq.uid_level, "_yr", freq.cutoff_year), dist_uids) else
+    dist_uids <- data.table(uid_label = freq.uid_level, dist_uids)
+  freq.parms = list(freq.label_data = freq.label_data,  freq.uid_level = freq.uid_level, freq.cutoff_year = freq.cutoff_year,freq.geo_resolution = freq.geo_resolution)
   setorder(dist_uids, -pct.species, species, -lat)
-  class(dist_uids) <- "cfs_freq"
+  result <- list(dist_uids = dist_uids, freq.parms = freq.parms)
+  class(result) <- "cfs_freq"
 
-  return(dist_uids)
+  return(result)
 }
 
 

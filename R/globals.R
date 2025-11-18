@@ -28,13 +28,18 @@ utils::globalVariables(c(
 
   # gamm_main
   "ageC", "res.normalized", "res.normalized.LL",  "res.resp_normalized",
-  "lat_use", "lon_use", "start.event", "aicc",
-  # cal.bai
+  "lat_use", "lon_use", "start.event", "aicc", "importance_pct",
+  # calc_bai
   "ba_cm2_t_1", "bai_cm2", "radius", "radius_prev", "med.rw",
   # tab_...
-  "ar1_rw", "corr_mean_rw", "mean_rw",  "pcorr_mean_rw", "rw.max", "rw.mean","rw.min",
+  "ar1_rw", "corr_mean_rw", "mean_rw",  "pcorr_mean_rw", "rw.max", "rw.mean","rw.min", "result",
   # CFS_scale
-  "chk.site", "distGeo", "dist_to_chk_km", "distm"
+  "chk.site", "dist_to_chk_km",
+  # plot_mapping
+  "species.inuse",
+  #plot_resp
+  "lwr", "upr", "maxv", "minv",'group',"x","group", "y.resp", 'byterm', 'term', 'fit'
+
 
   )
 )

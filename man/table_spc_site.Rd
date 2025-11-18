@@ -4,14 +4,14 @@
 \alias{table_spc_site}
 \title{Generate table for site report including the kNN result}
 \usage{
-table_spc_site(dt.radii.spc, rw_ref, N.nbs.qa)
+table_spc_site(dt.radii.spc, rw_ref, scale.N_nbs)
 }
 \arguments{
 \item{dt.radii.spc}{result table from table_spc_site_radii}
 
 \item{rw_ref}{data table of reference for kNN, in wide format}
 
-\item{N.nbs.qa}{number of neighbor to search}
+\item{scale.N_nbs}{number of neighbor to search}
 }
 \value{
 a data table.

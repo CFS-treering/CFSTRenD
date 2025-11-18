@@ -9,13 +9,6 @@
 #' @param m.candidates the list of formulas.
 #'
 #'
-#' @import mgcv
-#' @import nlme
-#' @importFrom MuMIn AICc
-#' @import utils
-#' @import data.table
-#'
-#'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
 #' @details
 #' This function models a gam model without considering random effects or autocorrelation.
@@ -46,13 +39,6 @@ gam_mod <- function(data, resp_scale = "", m.candidates){
 #' @param resp_scale the scale of response variable. default is "log" for log-scale, otherwise modeling the response variable as it is
 #' @param m.candidates the list of formulas.
 #'
-#'
-#' @import mgcv
-#' @import nlme
-#' @import stats
-#' @importFrom MuMIn AICc
-#' @import utils
-#' @import data.table
 #'
 #'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
@@ -89,12 +75,6 @@ gamm_radius <- function(data, resp_scale = "resp_gamma", m.candidates){
 #'
 #'
 #'
-#' @import mgcv
-#' @import nlme
-#' @importFrom MuMIn AICc
-#' @import stats
-#' @import utils
-#' @import data.table
 #'
 #'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
@@ -114,7 +94,7 @@ gamm_radius <- function(data, resp_scale = "resp_gamma", m.candidates){
 #'
 gamm_site <- function(data, resp_scale = "resp_gamma", m.candidates){
 
-  data$uid_tree.fac <- as.factor(as.character(data$uid_tree))
+  data$uid_radius.fac <- as.factor(as.character(data$uid_radius))
   gamm_main(data , resp_scale , m.option = 2, m.candidates )
 }
 
@@ -131,12 +111,6 @@ gamm_site <- function(data, resp_scale = "resp_gamma", m.candidates){
 #'
 #'
 #'
-#' @import mgcv
-#' @import nlme
-#' @import stats
-#' @importFrom MuMIn AICc
-#' @import utils
-#' @import data.table
 #'
 #'
 #' @return list including model, fitting statistics, ptable, stable, prediction table and spatial effect(moranI)
@@ -155,7 +129,7 @@ gamm_site <- function(data, resp_scale = "resp_gamma", m.candidates){
 #' @export gamm_spatial
 
 gamm_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
-  data$uid_tree.fac <- as.factor(as.character(data$uid_tree))
+  data$uid_radius.fac <- as.factor(as.character(data$uid_radius))
   data$uid_site.fac <- as.factor(as.character(data$uid_site))
   m.candidates <- paste0(m.candidates, " + s(uid_site.fac, bs = 're')")
   gamm_main(data , resp_scale , m.option = 3, m.candidates)
@@ -175,18 +149,11 @@ gamm_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
 #'
 #'
 #'
-#' @import furrr
-#' @import parallel
+# #' @import furrr
 
-#' @import mgcv
-#' @import itsadug
-#' @import nlme
-#' @import stats
-#' @importFrom MuMIn AICc
-#' @import utils
-#' @import data.table
-#' @import sp
-#' @import spdep
+
+# #' @import sp
+# #' @import spdep
 #'
 #'
 #' @return list including model, fitting statistics, ptable, stable and prediction table
@@ -207,7 +174,7 @@ gamm_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
 #' @export bam_spatial
 
 bam_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
-  data$uid_tree.fac <- as.factor(as.character(data$uid_tree))
+  data$uid_radius.fac <- as.factor(as.character(data$uid_radius))
   data$uid_site.fac <- as.factor(as.character(data$uid_site))
   m.candidates <- paste0(m.candidates, " + s(uid_site.fac, bs = 're')")
   gamm_main(data , resp_scale , m.option = 4, m.candidates)
@@ -218,6 +185,9 @@ bam_spatial <- function(data, resp_scale = "resp_gamma", m.candidates){
 
 # main function
 gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
+
+  check_optional_deps()
+
   if (length(m.candidates) == 0) stop("must assign the equation(s) to m.candidates")
   if ( !(resp_scale %in% c("resp_log", "resp_gamma", "resp_gaussian"))) stop(paste0( "please check resp_scale, it allows 3 options: resp_log, on log-scale of resp; resp_gaussian, on response scale assuming gaussian distribution; resp_gamma, on response scale with family Gamma(log)"))
 #   if (resp_scale == "resp_log") {
@@ -245,46 +215,128 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
       if (m.option == 0){
 
-        m.tmp <- gam(formul,
-                      method = "ML",family = famil, data = data)
+        # m.tmp <- gam(formul,
+        #               method = "ML",family = famil, data = data)
+
+        m.tmp <- tryCatch({
+
+          gam(formul, method = "ML",family = famil, data = data)
+
+        }, warning = function(w) {
+          # warning_message.c <<- conditionMessage(w)  # Store the warning message
+          message("Warning captured : ", conditionMessage(w))
+          return(NULL)  # Return NULL if a warning occurs
+        }, error = function(e) {
+          # error_message.c <<- conditionMessage(e)  # Store error message
+          message("error captured : ", conditionMessage(e))
+          return(NULL)  # Return NULL to prevent stopping execution
+        })
 
       }
       if (m.option == 1){
 
-        m.tmp <- gamm(formul,
-                      correlation = corCAR1(value = 0.5),
-                      method = "ML",family = famil, data = data)
+        # m.tmp <- gamm(formul,
+        #               correlation = corCAR1(value = 0.5),
+        #               method = "ML",family = famil, data = data)
+
+        m.tmp <- tryCatch({
+
+          gamm(formul,
+               correlation = corCAR1(value = 0.5),
+               method = "ML",family = famil, data = data)
+
+        }, warning = function(w) {
+          # warning_message.c <<- conditionMessage(w)  # Store the warning message
+          message("Warning captured : ", conditionMessage(w))
+          return(NULL)  # Return NULL if a warning occurs
+        }, error = function(e) {
+          # error_message.c <<- conditionMessage(e)  # Store error message
+          message("error captured : ", conditionMessage(e))
+          return(NULL)  # Return NULL to prevent stopping execution
+        })
 
       }
       if (m.option %in% c(2,3)){
-        m.tmp <- gamm(formul,
-                      random = list(uid_tree.fac=~1), correlation = corCAR1(value = 0.5),
-                      method = "ML",family = famil, data = data)
+        # m.tmp <- gamm(formul,
+        #               random = list(uid_radius.fac=~1), correlation = corCAR1(value = 0.5),
+        #               method = "ML",family = famil, data = data)
+
+        m.tmp <- tryCatch({
+
+          gamm(formul,
+               random = list(uid_radius.fac=~1), correlation = corCAR1(value = 0.5),
+               method = "ML",family = famil, data = data)
+
+        }, warning = function(w) {
+          # warning_message.c <<- conditionMessage(w)  # Store the warning message
+          message("Warning captured : ", conditionMessage(w))
+          return(NULL)  # Return NULL if a warning occurs
+        }, error = function(e) {
+          # error_message.c <<- conditionMessage(e)  # Store error message
+          message("error captured : ", conditionMessage(e))
+          return(NULL)  # Return NULL to prevent stopping execution
+        })
+
       }
 
       if (m.option == 4)  {
                # Detect available cores for parallel processing
-        available_cores <- detectCores(logical = FALSE) - 1  # Adjusted cores based on system
+        available_cores <- parallel::detectCores(logical = FALSE) - 1  # Adjusted cores based on system
 
         # Decide if parallel processing is supported
         if (available_cores > 1) {
-          plan(multisession, workers = available_cores)
+          future::plan(future::multisession, workers = available_cores)
         } else {
-          plan(sequential)
+          future::plan(future::sequential)
         }
 
-        m0.tmp <- bam(formul,
+        # m0.tmp <- bam(formul,
+        #
+        #               method = "ML",data = data)
+        # setorder(data, uid_site, uid_radius, ageC)
+        # data[, start.event := c(TRUE, rep(FALSE, .N - 1)), by = .(uid_site, uid_radius)]
+        #
 
-                      method = "ML",data = data)
-        setorder(data, uid_site, uid_tree, ageC)
-        data[, start.event := c(TRUE, rep(FALSE, .N - 1)), by = .(uid_site, uid_tree)]
+        m0.tmp <- tryCatch({
+
+          bam(formul,
+
+              method = "ML",data = data)
+          setorder(data, uid_site, uid_radius, ageC)
+          data[, start.event := c(TRUE, rep(FALSE, .N - 1)), by = .(uid_site, uid_radius)]
+
+        }, warning = function(w) {
+          # warning_message.c <<- conditionMessage(w)  # Store the warning message
+          message("Warning captured : ", conditionMessage(w))
+          return(NULL)  # Return NULL if a warning occurs
+        }, error = function(e) {
+          # error_message.c <<- conditionMessage(e)  # Store error message
+          message("error captured : ", conditionMessage(e))
+          return(NULL)  # Return NULL to prevent stopping execution
+        })
+
         # r1 <- start_value_rho(m0, plot=TRUE)
         # print (paste0(Sys.time(), "          ar1"))
-        m.tmp <- bam(formul, data=data, rho=start_value_rho(m0.tmp, plot=FALSE), AR.start=data$start.event, method = "ML")
+        # m.tmp <- bam(formul, data=data, rho=start_value_rho(m0.tmp, plot=FALSE), AR.start=data$start.event, method = "ML")
+
+        m.tmp <- tryCatch({
+
+          bam(formul, data=data, rho=start_value_rho(m0.tmp, plot=FALSE), AR.start=data$start.event, method = "ML")
+
+
+        }, warning = function(w) {
+          # warning_message.c <<- conditionMessage(w)  # Store the warning message
+          message("Warning captured : ", conditionMessage(w))
+          return(NULL)  # Return NULL if a warning occurs
+        }, error = function(e) {
+          # error_message.c <<- conditionMessage(e)  # Store error message
+          message("error captured : ", conditionMessage(e))
+          return(NULL)  # Return NULL to prevent stopping execution
+        })
 
         rm(m0.tmp)
         # Reset to sequential
-        plan(sequential)
+        future::plan(future::sequential)
 
       }
       # if (m.option < 4){
@@ -300,8 +352,11 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
       #
       #   }
       # }else{
-
-        aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp), aicc = AICc(m.tmp), bic =  BIC(m.tmp), R2 = summary(m.tmp)$r.sq, methd = "ML")
+      if (is.null(m.tmp)) {
+        next
+      }
+        aic.tmp <- data.table(i = i, form = gsub("\\\\", "", paste(deparse(formul), collapse = " ")), aic =  AIC(m.tmp), aicc = MuMIn::AICc(m.tmp), bic =  BIC(m.tmp), methd = "ML")
+        if (m.option %in% c(1,2,3)) aic.tmp <- data.table(aic.tmp, R2 = summary(m.tmp$gam)$r.sq, methd = "ML") else aic.tmp <- data.table(aic.tmp, R2 = summary(m.tmp)$r.sq, methd = "ML")
 
     # }
 
@@ -326,7 +381,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
     # if (!is.null(out.csv)){
     #
     #   if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
-    #   write.csv(aic.all, file =  file.path(out.csv, paste0("fitting ML.csv")), row.names = FALSE, na = "")
+    #   utils::write.csv(aic.all, file =  file.path(out.csv, paste0("fitting ML.csv")), row.names = FALSE, na = "")
     # }
 
 
@@ -338,21 +393,74 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
   # fitting REML for prediction
 
   if (m.option == 0) {
-    m.sel <- gam(form.sel,
-                method = "REML",family = famil, data = data)
+    # m.sel <- gam(form.sel,
+    #             method = "REML",family = famil, data = data)
+
+    m.sel <- tryCatch({
+
+      gam(form.sel,
+          method = "REML",family = famil, data = data)
+
+    }, warning = function(w) {
+      # warning_message.c <<- conditionMessage(w)  # Store the warning message
+      message("Warning captured : ", conditionMessage(w))
+      return(NULL)  # Return NULL if a warning occurs
+    }, error = function(e) {
+      # error_message.c <<- conditionMessage(e)  # Store error message
+      message("error captured : ", conditionMessage(e))
+      return(NULL)  # Return NULL to prevent stopping execution
+    })
 
   }
 
   if (m.option == 1) {
-    m.sel <- gamm(form.sel,
-                  correlation = corCAR1(value = 0.5),
-                  method = "REML",family = famil, data = data)
+    # m.sel <- gamm(form.sel,
+    #               correlation = corCAR1(value = 0.5),
+    #               method = "REML",family = famil, data = data)
+
+    m.sel <- tryCatch({
+
+      gamm(form.sel,
+           correlation = corCAR1(value = 0.5),
+           method = "REML",family = famil, data = data)
+
+    }, warning = function(w) {
+      # warning_message.c <<- conditionMessage(w)  # Store the warning message
+      message("Warning captured : ", conditionMessage(w))
+      return(NULL)  # Return NULL if a warning occurs
+    }, error = function(e) {
+      # error_message.c <<- conditionMessage(e)  # Store error message
+      message("error captured : ", conditionMessage(e))
+      return(NULL)  # Return NULL to prevent stopping execution
+    })
+
 
   }
    if (m.option %in% c(2,3)) {
-     m.sel <- gamm(form.sel,
-                  random = list(uid_tree.fac=~1), correlation = corCAR1(value = 0.5),
-                  method = "REML",family = famil, data = data)
+     # m.sel <- gamm(form.sel,
+     #              random = list(uid_radius.fac=~1), correlation = corCAR1(value = 0.5),
+     #              method = "REML",family = famil, data = data)
+     #
+
+     m.sel <- tryCatch({
+
+       gamm(form.sel,
+            random = list(uid_radius.fac=~1), correlation = corCAR1(value = 0.5),
+            method = "REML",family = famil, data = data)
+
+     }, warning = function(w) {
+       # warning_message.c <<- conditionMessage(w)  # Store the warning message
+       message("Warning captured : ", conditionMessage(w))
+       return(NULL)  # Return NULL if a warning occurs
+     }, error = function(e) {
+       # error_message.c <<- conditionMessage(e)  # Store error message
+       message("error captured : ", conditionMessage(e))
+       return(NULL)  # Return NULL to prevent stopping execution
+     })
+
+
+
+
     data[, res.normalized:=residuals(m.sel$lme, type = "normalized")]
     # Extract the substring inside parentheses in case in log-scale
     y.char <- sub(".*\\((.*?)\\).*", "\\1", all.vars(m.sel$gam$formula)[1])
@@ -362,37 +470,78 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
 
       # Detect available cores for parallel processing
-      available_cores <- detectCores(logical = FALSE) - 1  # Adjusted cores based on system
+      available_cores <- parallel::detectCores(logical = FALSE) - 1  # Adjusted cores based on system
 
       # Decide if parallel processing is supported
       if (available_cores > 1) {
-        plan(multisession, workers = available_cores)
+        future::plan(future::multisession, workers = available_cores)
       } else {
-        plan(sequential)
+        future::plan(future::sequential)
       }
 
-      m0.sel <- bam(form.sel,
+      # m0.sel <- bam(form.sel,
+      #
+      #               method = "fREML",data = data)
 
-                    method = "fREML",data = data)
-      setorder(data, uid_site, uid_tree, ageC)
-      data[, start.event := c(TRUE, rep(FALSE, .N - 1)), by = .(uid_site, uid_tree)]
+
+      m0.sel <- tryCatch({
+
+        bam(form.sel,
+
+            method = "fREML",data = data)
+
+      }, warning = function(w) {
+        # warning_message.c <<- conditionMessage(w)  # Store the warning message
+        message("Warning captured : ", conditionMessage(w))
+        return(NULL)  # Return NULL if a warning occurs
+      }, error = function(e) {
+        # error_message.c <<- conditionMessage(e)  # Store error message
+        message("error captured : ", conditionMessage(e))
+        return(NULL)  # Return NULL to prevent stopping execution
+      })
+
+
+
+      setorder(data, uid_site, uid_radius, ageC)
+      data[, start.event := c(TRUE, rep(FALSE, .N - 1)), by = .(uid_site, uid_radius)]
 
       # Step 3: Add rho and AR1 structure
       rho.start <- start_value_rho(m0.sel, plot = FALSE)
-      m.sel <- bam(
-        form.sel,
-        data = data,
-        rho = rho.start,
-        AR.start = data$start.event,
-        method = "fREML"
-      )
+      # m.sel <- bam(
+      #   form.sel,
+      #   data = data,
+      #   rho = rho.start,
+      #   AR.start = data$start.event,
+      #   method = "fREML"
+      # )
+
+      m.sel <- tryCatch({
+
+        bam(
+          form.sel,
+          data = data,
+          rho = rho.start,
+          AR.start = data$start.event,
+          method = "fREML"
+        )
+
+      }, warning = function(w) {
+        # warning_message.c <<- conditionMessage(w)  # Store the warning message
+        message("Warning captured : ", conditionMessage(w))
+        return(NULL)  # Return NULL if a warning occurs
+      }, error = function(e) {
+        # error_message.c <<- conditionMessage(e)  # Store error message
+        message("error captured : ", conditionMessage(e))
+        return(NULL)  # Return NULL to prevent stopping execution
+      })
+
 
       data[start.event==FALSE, res.normalized:=resid_gam(m.sel)]
       # Extract the substring inside parentheses in case in log-scale
       y.char <- sub(".*\\((.*?)\\).*", "\\1", all.vars(m.sel$formula)[1])
 
       # Reset to sequential
-      plan(sequential)
+      future::plan(future::sequential)
 
 
   }
@@ -404,16 +553,16 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
       y.site <- data[!is.na(res.normalized), .(obs.med = median(get(y.char)), res.med = median(res.normalized)), by = .(lon_use, lat_use )]
       if (nrow(y.site) > 5) {
-      coordinates(y.site) <- ~ lon_use+lat_use
-      knea <- knearneigh(coordinates(y.site), longlat = TRUE)
-      nb <- knn2nb(knea)
-      lw <- nb2listw(nb, style = "W", zero.policy = TRUE)
-      moran.I.o <- moran.test(y.site$obs.med,lw)
+      sp::coordinates(y.site) <- ~ lon_use+lat_use
+      knea <- spdep::knearneigh(sp::coordinates(y.site), longlat = TRUE)
+      nb <- spdep::knn2nb(knea)
+      lw <- spdep::nb2listw(nb, style = "W", zero.policy = TRUE)
+      moran.I.o <- spdep::moran.test(y.site$obs.med,lw)
       moran.I.o <- data.frame(statistic = moran.I.o$estimate[1], expected = moran.I.o$estimate[2], Variance = moran.I.o$estimate[3],
                               p.value = moran.I.o$p.value)
       names(moran.I.o) <- paste0(names(moran.I.o), ".obs")
 
-      moran.I.r <- moran.test(y.site$res.med,lw)
+      moran.I.r <- spdep::moran.test(y.site$res.med,lw)
       moran.I.r <- data.frame(statistic = moran.I.r$estimate[1], expected = moran.I.r$estimate[2], Variance = moran.I.r$estimate[3],
                               p.value = moran.I.r$p.value)
       names(moran.I.r) <- paste0(names(moran.I.r), ".res")
@@ -423,27 +572,27 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
       if (m.option == 3)  {
         form.sel <- update(m.sel$gam$formula, . ~ . + s(latitude, longitude, bs = "sos"))
         m.sel <- gamm(form.sel,  data = data,
-                      random = list(uid_tree.fac= ~1),correlation =  corCAR1(value = 0.5),
+                      random = list(uid_radius.fac= ~1),correlation =  corCAR1(value = 0.5),
                       family = famil)
         data[, res.normalized.LL:=residuals(m.sel$lme, type = "normalized")]
       }
         if (m.option == 4)  {
           form.sel <- update(m.sel$formula, . ~ . + s(latitude, longitude, bs = "tp", k = 5))
           # Detect available cores for parallel processing
-          available_cores <- detectCores(logical = FALSE) - 1  # Adjusted cores based on system
+          available_cores <- parallel::detectCores(logical = FALSE) - 1  # Adjusted cores based on system
 
           # Decide if parallel processing is supported
           if (available_cores > 1) {
-            plan(multisession, workers = available_cores)
+            future::plan(future::multisession, workers = available_cores)
           } else {
-            plan(sequential)
+            future::plan(future::sequential)
           }
 
           m0.sel <- bam(form.sel,
 
                         method = "fREML",data = data)
-          setorder(data, uid_site, uid_tree, ageC)
-          # data[, idrow:=seq_len(.N), by = .(uid_site, uid_tree)][,start.event := (idrow== 1)][, idrow:= NULL]
+          setorder(data, uid_site, uid_radius, ageC)
+          # data[, idrow:=seq_len(.N), by = .(uid_site, uid_radius)][,start.event := (idrow== 1)][, idrow:= NULL]
           # r1 <- start_value_rho(m0, plot=TRUE)
           # print (paste0(Sys.time(), "          ar1"))
           m.sel <- bam(form.sel, data=data, rho=start_value_rho(m0.sel, plot=FALSE), AR.start=data$start.event)
@@ -451,13 +600,13 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
           data[start.event==FALSE, res.normalized.LL:=resid_gam(m.sel)]
 
           # Reset to sequential
-          plan(sequential)
+          future::plan(future::sequential)
 
         }
 
         y.site <- data[!is.na(res.normalized.LL), .(res.med.LL = median(res.normalized.LL)), by = .(lon_use, lat_use )]
 
-        moran.I.r_LL <- moran.test(y.site$res.med.LL,lw)
+        moran.I.r_LL <- spdep::moran.test(y.site$res.med.LL,lw)
         moran.I.r_LL <- data.frame(statistic = moran.I.r_LL$estimate[1], expected = moran.I.r_LL$estimate[2], Variance = moran.I.r_LL$estimate[3],
                                 p.value = moran.I.r_LL$p.value)
         names(moran.I.r_LL) <- paste0(names(moran.I.r_LL), ".res_LL")
@@ -494,7 +643,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
   ptable <- data.table(Parameter = row.names(summary(msel.gam)$p.table), summary(msel.gam)$p.table )
   stable <- data.table(Parameter = row.names(summary(msel.gam)$s.table), summary(msel.gam)$s.table)
-  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), aicc = AICc(m.sel), bic =  BIC(m.sel), R2 = summary(msel.gam)$r.sq,  methd = "REML")
+  aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), aicc = MuMIn::AICc(m.sel), bic =  BIC(m.sel), R2 = summary(msel.gam)$r.sq,  methd = "REML")
   # if (m.option == 0) {
   #   aic.reml$aic <-  AIC(msel.gam)
   #   aic.reml$aicc <- AICc(msel.gam)
@@ -520,7 +669,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
     ptable <- data.table(Parameter = row.names(summary(m.sel)$p.table), summary(m.sel)$p.table )
     stable <- data.table(Parameter = row.names(summary(m.sel)$s.table), summary(m.sel)$s.table)
-    aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), aicc = AICc(m.sel), bic = BIC(m.sel), R2 = summary(m.sel)$r.sq, methd = "fREML")
+    aic.reml <- data.table(form = gsub("\\\\", "", paste(deparse(form.sel), collapse = " ")), aic =  AIC(m.sel), aicc = MuMIn::AICc(m.sel), bic = BIC(m.sel), R2 = summary(m.sel)$r.sq, methd = "fREML")
 
   }
   # rename log-scale
@@ -532,68 +681,21 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
   # if (!is.null(out.csv)){
   #
   #   if (!(dir.exists(out.csv))) dir.create(out.csv, recursive = TRUE)
-  #   write.csv(ptable, file =  file.path(out.csv, paste0("ptable ", "REML" ,".csv")), row.names = FALSE, na = "")
-  #   write.csv(stable, file =  file.path(out.csv, paste0("stable ", "REML" ,".csv")), row.names = FALSE, na = "")
-  #   write.csv(tmp.y, file = file.path(out.csv, paste0("prediction ", "REML" ,".csv")), row.names = FALSE, na = "")
-  #   write.csv(aic.reml, file = file.path(out.csv, paste0("fitting ", "REML" ,".csv")), row.names = FALSE, na = "")
+  #   utils::write.csv(ptable, file =  file.path(out.csv, paste0("ptable ", "REML" ,".csv")), row.names = FALSE, na = "")
+  #   utils::write.csv(stable, file =  file.path(out.csv, paste0("stable ", "REML" ,".csv")), row.names = FALSE, na = "")
+  #   utils::write.csv(tmp.y, file = file.path(out.csv, paste0("prediction ", "REML" ,".csv")), row.names = FALSE, na = "")
+  #   utils::write.csv(aic.reml, file = file.path(out.csv, paste0("fitting ", "REML" ,".csv")), row.names = FALSE, na = "")
   # }
-
+  m.sel$resp_scale <- resp_scale
+  aic.reml$resp_scale <- resp_scale
   return.lst <- list(model = m.sel, fitting = aic.reml, ptable = ptable, stable = stable, pred = tmp.y)
   if (m.option >= 3 & exists("moranI")) return.lst$moranI <- moranI
   if (length(m.candidates) > 1)  return.lst$fitting_ML <- aic.all
-
+  class(return.lst) <- "cfs_model"
   return(return.lst)
 }
 
 
-
-#' calculate bai
-
-#' @description
-#' calculate basal area (cm2) and basal area increment (cm2)
-#'
-#'
-#' @param dt.long data in long format containing at least 3 columns: id, year, rw
-#' @param id column name of series id
-#' @param rw column name of ring width measurement which is in mm
-#'
-#'
-#' @import data.table
-#'
-#'
-#' @return add 3 columns to the original input data, ageC for cambial age, ba_cm2_t_1 for basal area of the previous year in cm2, and bai_cm2 for annual basal area increment in cm2
-#'
-#' @export cal.bai
-
-
-cal.bai <- function(dt.long, id , rw){
-  setDT(dt.long)
-  med.rw <- median(as.numeric(dt.long[[rw]]), na.rm = TRUE)
-  # cat("please assure the unit of ", rw, " is mm")
-
-  if (!all(c(id, "year", rw) %in% names(dt.long))) stop (paste0("at least one of the variables ", id, "year", rw, "not exists, please verify..."))
-
-  if (nrow(dt.long[, .N, by = eval(c(id, "year"))][N>1]) > 0) stop (paste0(id, "-year is not a unique key, please verify..."))
-
-  if (med.rw > 10) print(paste0("median of rw ", med.rw, " seems too big, assure it's in mm"))
-  if (med.rw < 1) print(paste0("median of rw ", med.rw, " seems too small, assure it's in mm"))
-
-  setorderv(dt.long, c(id, "year"))
-
-  dt.long[, `:=`(ageC = seq_len(.N),
-                 radius = cumsum(eval(parse(text = rw))),  # Cumulative radius (assumes RW is added each year)
-                 radius_prev = shift(cumsum(eval(parse(text = rw))), fill = 0)), by = eval(id)]  # Previous radius (shifted)
-
-  # Compute previous BA in cm2
-  dt.long[, ba_cm2_t_1 := pi * (radius_prev^2)/100]
-
-  dt.long[, bai_cm2 := pi * (radius^2 - radius_prev^2)/100]
-  dt.long[bai_cm2 < 0]
-
-  # Drop the radius columns if not needed
-  dt.long[, c("radius", "radius_prev") := NULL]
-  return(dt.long)
-}
 
 
 #' format wide to long
@@ -603,13 +705,14 @@ cal.bai <- function(dt.long, id , rw){
 #'
 #'
 #' @param model a gam model
-#'
-#' @import data.table
+#' @param dt.pred prediction table from gam model
 #'
 #'
 #' @return dt.pred, the term prediction by gam were formed as 1 term, for both fits and stand error
 #'
-#' @export format_byterm
+
+#' @keywords internal
+#' @noRd
 
 
 format_byterm <- function(model, dt.pred){
@@ -664,4 +767,178 @@ format_byterm <- function(model, dt.pred){
     }
 
   return(dt.pred)
+}
+
+
+
+
+#' variable importance of smooth terms in a GAM model
+
+#' @description
+#' Evaluates the relative influence of each smooth term in a GAM model by computing
+#' its contribution to the fitted values using the linear predictor matrix
+#' (\code{type = "lpmatrix"}). Three summary methods are available: sum of squares,
+#' variance, and mean absolute value across all observations.
+#' #'
+#'
+#' @param gam_model A GAM model object.
+#' @param method A character string specifying the method to compute importance.
+#'        One of \code{"ssq"}, \code{"var"}, or \code{"meanabs"}.
+#'
+#' @return A \code{data.table} with columns:
+#' \describe{
+#'   \item{var}{Name of the smooth term.}
+#'   \item{importance_pct}{Relative importance as a percentage.}
+#'   \item{method}{The method used for calculating the importance.}
+#' }
+#'
+#' @export sterm_imp
+
+
+
+sterm_imp <- function(gam_model, method = c("ssq", "var", "meanabs")) {
+  method <- match.arg(method)
+  data <- gam_model$model
+
+  # Ensure factor levels match
+  for (v in names(data)) {
+    if (is.factor(data[[v]])) {
+      data[[v]] <- factor(data[[v]], levels = levels(gam_model$model[[v]]))
+    }
+  }
+
+  # Predict lpmatrix and extract coefficients
+  X <- predict(gam_model, newdata = data, type = "lpmatrix")
+  beta <- coef(gam_model)
+
+  # Map each smooth term to its coefficient indices
+  term_map <- setNames(
+    lapply(gam_model$smooth, function(sm) sm$first.para:sm$last.para),
+    vapply(gam_model$smooth, `[[`, "", "label")
+  )
+
+  # Compute importance measure
+  term_contrib <- sapply(term_map, function(cols) {
+    values <- X[, cols, drop = FALSE] %*% beta[cols]
+    switch(method,
+           ssq     = sum(values^2),
+           var     = var(as.vector(values)),
+           meanabs = mean(abs(values)))
+  })
+
+  # Normalize and format output
+  importance <- term_contrib / sum(term_contrib)
+  data.table(
+    term = names(importance),
+    importance_pct = round(importance * 100, 1),
+    method = method
+  )[order(-importance_pct)]
+}
+
+
+#' Compute confidence intervals for GAM predictions
+#'
+#' This function computes predicted values and confidence intervals from a fitted GAM model
+#' with a log-link (or other link) and optionally back-transforms predictions to the response scale.
+#' Five methods are supported:
+#' 1. **delta_link**: classic delta method on the linear predictor (link) scale; back-transformed CI is asymmetric.
+#' 2. **delta_resp**: delta method applied directly on the response scale using Var[exp(η)] ≈ exp(2η) Var(η).
+#' 3. **bootstrap_link**: parametric bootstrap on the linear predictor; quantiles back-transformed.
+#' 4. **bootstrap_resp**: parametric bootstrap on the response scale; quantiles computed after exponentiating.
+#' 5. **posterior**: Bayesian posterior simulation using the model covariance matrix; quantiles on response scale.
+#'
+#' References:
+#' - Wood, S.N. (2017) *Generalized Additive Models: An Introduction with R, 2nd Edition*. CRC Press.
+#' - Efron, B., & Tibshirani, R. (1993) *An Introduction to the Bootstrap*. Chapman & Hall.
+#' - Gelman, A., et al. (2013) *Bayesian Data Analysis, 3rd Edition*. CRC Press.
+#'
+#' @param model A fitted GAM object from \code{mgcv::gam}.
+#' @param newdata A data.frame containing values at which to predict.
+#' @param nboot Integer. Number of bootstrap or posterior samples. Default 1000.
+#' @param method Character. One of \code{"delta_link"}, \code{"delta_resp"}, \code{"bootstrap_link"}, \code{"bootstrap_resp"}, \code{"posterior"}.
+#' @param level Numeric. Confidence level, default 0.95.
+#'
+#' @return A \code{data.table} with columns: \code{fit}, \code{lwr}, \code{upr}.
+#'
+
+#' @export
+ci_resp <- function(model, newdata, nboot = 100,
+                    method = c("delta_link", "delta_resp", "bootstrap_link", "bootstrap_resp", "posterior"),
+                    level = 0.95) {
+
+  check_optional_deps()
+  # Adaptive method selection for small samples
+  if (nrow(newdata) < 30) {
+    message("Small sample detected (n < ", "30",
+            "). Switching CI method to 'posterior' for robustness.")
+    method <- "posterior"
+  } else {
+    method <- match.arg(method)
+  }
+
+  alpha <- (1 - level)/2
+  X <- predict(model, newdata = newdata, type = "lpmatrix")
+  coefs <- coef(model)
+  Vb <- vcov(model)
+  eta_hat <- drop(X %*% coefs)
+  fit_resp <- exp(eta_hat)
+  out <- data.table::copy(newdata)
+  setDT(out)
+  is_log_model <- model$resp_scale %in% c("resp_gamma", "resp_log")
+  if (length(model$resp_scale) == 0) stop("cannot pass resp_scale")
+  if (length(model$is_log_model) == 0) stop("cannot pass is_log_model")
+
+  # if (model$is_log_model == FALSE){
+  if (is_log_model == FALSE){
+    pred <- predict(model, newdata, type = "link", se.fit = TRUE)
+    q_low  <- pred$fit - qnorm(1 - alpha) * pred$se.fit
+    q_high <- pred$fit + qnorm(1 - alpha) * pred$se.fit
+    out [, c("fit", "lwr", "upr"):= .(pred$fit, q_low, q_high)]
+  }else{
+  if (method == "delta_link") {
+    pred <- predict(model, newdata, type = "link", se.fit = TRUE)
+    q_low  <- pred$fit - qnorm(1 - alpha) * pred$se.fit
+    q_high <- pred$fit + qnorm(1 - alpha) * pred$se.fit
+    out [, c("fit", "lwr", "upr"):= .(exp(pred$fit), exp(q_low), exp(q_high) )]
+
+
+
+  } else if (method == "delta_resp") {
+    pred <- predict(model, newdata, type = "link", se.fit = TRUE)
+    var_resp <- (exp(pred$fit))^2 * (pred$se.fit)^2
+    se_resp <- sqrt(var_resp)
+    out [, c("fit", "lwr", "upr"):= .(exp(pred$fit), fit_resp - qnorm(1 - alpha) * se_resp, fit_resp + qnorm(1 - alpha) * se_resp )]
+
+  } else if (method %in% c("bootstrap_link", "bootstrap_resp")) {
+    beta_star <- MASS::mvrnorm(nboot, coefs, Vb)
+    eta_star <- X %*% t(beta_star)
+
+    if (method == "bootstrap_link") {
+      q_low  <- apply(eta_star, 1, quantile, probs = alpha)
+      q_high <- apply(eta_star, 1, quantile, probs = 1 - alpha)
+      out [, c("fit", "lwr", "upr"):= .(fit_resp, exp(q_low), exp(q_high) )]
+
+    } else {
+      y_star <- exp(eta_star)
+      q_low  <- apply(y_star, 1, quantile, probs = alpha)
+      q_high <- apply(y_star, 1, quantile, probs = 1 - alpha)
+      out <- data.table::data.table(
+        fit = fit_resp,
+        lwr = q_low,
+        upr = q_high
+      )
+      out [, c("fit", "lwr", "upr"):= .(fit_resp, q_low, q_high )]
+    }
+
+  } else if (method == "posterior") {
+    beta_star <- mgcv::rmvn(nboot, coefs, Vb)
+    eta_star <- X %*% t(beta_star)
+    y_star <- exp(eta_star)
+    q_low  <- apply(y_star, 1, quantile, probs = alpha)
+    q_high <- apply(y_star, 1, quantile, probs = 1 - alpha)
+    out [, c("fit", "lwr", "upr"):= .(fit_resp, q_low, q_high )]
+  }
+    }
+  out$ci_method <- method
+  return(out)
 }

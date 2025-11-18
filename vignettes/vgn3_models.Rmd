@@ -1,0 +1,144 @@
+---
+title: "Additive Models"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: TRUE
+    toc_depth: 4            # Define the depth of the TOC (increase as needed)
+    toc_float:
+      collapsed: TRUE      # Whether the TOC starts collapsed
+      smooth_scroll: TRUE   # Smooth scrolling when a TOC entry is clicked
+fontsize: 12pt              # Set font size
+linkcolor: blue             # Hyperlink color (for PDF output)
+
+
+
+vignette: >
+  %\VignetteIndexEntry{Additive Models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup_general, include = FALSE}
+knitr::opts_chunk$set(
+   echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+
+
+```{r setup_lib, include=FALSE}
+if (!requireNamespace("htmltools", quietly = TRUE)) {
+  stop("Package 'htmltools' is required to run this function. Please install it.")
+}
+library(CFSTRenD)
+library(data.table)
+library(ggplot2)
+library(sf)
+
+
+```
+
+
+# Additive models
+
+GAMs/GAMMs handle nonlinear relationships and can include random effects (e.g., site or tree identity) to account for hierarchical structures and temporal or spatial dependencies, making them well-suited for modeling complex dendrochronological data. in CFSTRenD package, a suite of GAM/GAMM models has been implemented to accommodate different types of datasets. Here, we use a single model, gamm_spatial, to demonstrate how to generate a fitting and diagnostic model report from raw data.
+
+
+### **prepare data for model:**
+```{r mod_data,  message = FALSE, warning = FALSE, results = 'hide'}
+
+
+# loading processed ring measurement
+samples69.trt <- readRDS(system.file("extdata", "samples69.trt.rds", package = "CFSTRenD"))
+
+# if no processed data, run function CFS_format() from raw dataset
+# # ring measurement
+# samples69.o <- fread(system.file("extdata", "samples69.csv", package = "CFSTRenD"))
+# 
+# # formatting the users' data conformed to CFSTRenD
+# samples69.trt <- CFS_format(data = list(samples69.o, 39:111), usage = 1, out.csv = NULL)
+
+# climate
+clim69 <- fread(system.file("extdata", "clim69.csv", package = "CFSTRenD"))
+
+# merge data
+samples69_clim <- merge(samples69.trt$tr_all_wide[, c("uid_site", "site_id","latitude", "longitude",  "species", "uid_tree", "uid_radius")], samples69.trt$tr_all_long$tr_7_ring_widths, by = "uid_radius")
+
+# # Calculate BAI
+samples69_clim <- calc_bai(samples69_clim, "uid_radius", "rw_mm")
+
+samples69_clim <- merge(samples69_clim, clim69, by = c("site_id", "year"))
+```
+
+<br>
+### **fitting model**
+
+This example uses gamm_spatial, but users may choose other functions (gamm_radius, gamm_site, bam_spatial, gam_mod) that follows the same arguments, according to their purpose and data.
+
+```{r mod_fitting,  message = FALSE, warning = FALSE, results = 'hide'}
+setorder(samples69_clim, uid_tree, year)
+
+# remove the first 10 years, at least remove ageC == 1, for the log-scale model functions
+m.sp <- gamm_spatial(data = samples69_clim[ageC > 1], resp_scale = "resp_log",
+                     m.candidates =c( "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC) + s(FFD)",
+                                      "bai_cm2 ~ log(ba_cm2_t_1) + s(ageC) + FFD")
+)
+```
+
+### **arguments of gamm_spatial:**
+
+**resp_scale**
+The function provides three options for specifying the response variable, and the user must choose the one that best suits their modelling purpose:
+
+"resp_gaussian": the response variable is used on its original scale and is modelled under a Gaussian distribution with an identity link (no transformation applied).
+
+"resp_log": the response variable is log-transformed prior to modelling. The transformed response is then assumed to follow a Gaussian distribution and is fitted using an identity link.
+
+"resp_gamma": the response variable is kept on its original scale, and the model is fitted under a Gamma distribution with a log link, appropriate for strictly positive and right-skewed data.
+
+
+**m.candidates**
+
+The list of all candidate equations.
+Note that the response variable is kept on its original scale in all cases, even when using the option "resp_log".
+
+
+```{r mod_report_demo, eval=FALSE, message = FALSE, warning = FALSE, results = 'hide'}
+
+generate_report(robj = m.sp)
+```
+
+
+
+```{r mod_report, include=FALSE, message = FALSE, warning = FALSE, results = 'hide'}
+
+outfile_mod <- tempfile(fileext = ".html")
+generate_report(robj = m.sp, output_file = outfile_mod)
+```
+
+```{r mod_inclu, echo = FALSE, results = 'asis'}
+
+cat('
+<div style="margin: 20px 0; padding: 10px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            border-radius: 8px;">
+')
+
+htmltools::includeHTML(outfile_mod)  # embed in vignette
+```
+------------------------------------------------------------------------
+
+
+
+# References
+
+-   Girardin et al., *CFS-TRenD: A National Tree-Ring Data Repository*, 2021
+-   Bunn, *Statistical Methods in Dendrochronology*, 2008

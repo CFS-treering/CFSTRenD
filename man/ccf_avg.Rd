@@ -2,21 +2,21 @@
 % Please edit documentation in R/quality_assessment.R
 \name{ccf_avg}
 \alias{ccf_avg}
-\title{ccf with master/mean chronology}
+\title{ccf with chronologies}
 \usage{
-ccf_avg(icol, data, blcrit = 0.1, max.lag = 10, qa_code = "fail")
+ccf_avg(icol, data, blcrit = 0.1, lag.max = 10, qa_code = "fail")
 }
 \arguments{
 \item{icol}{column index}
 
-\item{data}{data in wide format, first column is "Year", second column is master/mean chronology}
+\item{data}{data in wide format, first column is "Year", second column is chronologies}
 
 \item{blcrit}{criteria for borderline}
 
-\item{max.lag}{maximum lag for ccf}
+\item{lag.max}{maximum lag for ccf}
 
 \item{qa_code}{quality classification code (NULL, no code)}
 }
 \description{
-ccf with master/mean chronology
+ccf with chronologies
 }

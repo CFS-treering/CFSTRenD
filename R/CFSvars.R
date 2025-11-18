@@ -1,14 +1,10 @@
-#' prepare variable names and column order for each tables
+#' #' Prepare variable names and column order for each table
 #'
+#' Internal function to return variable descriptions for all tables.
 #'
-#' @import data.table
-#' @import stringr
-#'
-#' @return a data table of variable descriptions of all tables
-#' @export
-#'
-#' @examples
-#' meta.all <- variables.cfstrend()
+#' @return A data.table of variable descriptions of all tables
+#' @keywords internal
+#' @noRd
 variables.cfstrend <- function(){
   # data structure version, it changes with the structure changes,
   Ver.stru <- "s1.2"

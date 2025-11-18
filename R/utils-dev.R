@@ -1,0 +1,232 @@
+#' Search files for a given word or pattern
+#'
+#' Internal developer helper function for debugging.
+#' Not exported, not documented in the manual.
+#'
+#' @param word A character string or regex pattern to search for.
+#' @param files A character vector of file paths (default: all R files in R/).
+#' @keywords internal
+#' @noRd
+search_files <- function(word, files = list.files("R", pattern = "\\.R$", full.names = TRUE)) {
+  for (w in word) {
+    cat("\n--- Searching for:", w, "---\n")
+    results <- lapply(files, function(f) {
+      lines <- readLines(f, warn = FALSE)
+      hits <- grep(w, lines, value = TRUE)
+      if (length(hits) > 0) {
+        paste(basename(f), ":", hits)
+      }
+    })
+    results <- unlist(results)
+    if (length(results) == 0) {
+      cat("No matches found.\n")
+    } else {
+      cat(paste(results, collapse = "\n"), "\n")
+    }
+  }
+}
+
+
+#' Check Unqualified Function Calls in R and Rmd Files
+#'
+#' Internal helper function for package development.
+#' Scans R and Rmd files in specified paths for functions from given packages
+#' that are called without namespace (i.e., without `pkg::`).
+#'
+#' @param paths Character vector of paths to scan. Default is `c("R", "inst/rmd")`.
+#' @param pkgs Character vector of package names to check for. Default is `c("htmltools", "knitr", "gt")`.
+#'
+#' @return A data.frame with columns:
+#'   \describe{
+#'     \item{file}{File path}
+#'     \item{line}{Line number in the file}
+#'     \item{fun}{Function name found}
+#'     \item{pkg}{Package(s) the function belongs to}
+#'   }
+#'
+#' @keywords internal
+#' @noRd
+check_unqualified_calls <- function(paths = c("R", "inst/rmd"),
+                                    pkgs = c("htmltools", "knitr", "gt")) {
+
+  files <- unlist(lapply(paths, function(p) {
+    pattern <- if (p == "inst/rmd") "\\.Rmd$" else "\\.R$"
+    list.files(p, pattern = pattern, recursive = TRUE, full.names = TRUE)
+  }))
+
+  # build lookup: package -> exported functions
+  exported_funs <- lapply(pkgs, function(pkg) {
+    tryCatch(getNamespaceExports(pkg), error = function(e) character(0))
+  })
+  names(exported_funs) <- pkgs
+  all_exported <- unlist(exported_funs)
+
+  res <- lapply(files, function(f) {
+    lines <- readLines(f, warn = FALSE)
+
+    # remove trailing comments for scanning
+    code_content <- gsub("#.*$", "", lines)
+
+    # scan each line
+    line_dfs <- lapply(seq_along(code_content), function(i) {
+      line <- code_content[i]
+      matches <- regmatches(
+        line,
+        gregexpr("\\b(?<![[:alnum:]_:\\$\\[\\.])([a-zA-Z0-9_]+)\\s*\\(", line, perl = TRUE)
+      )
+      fns <- unlist(lapply(matches, function(x) gsub("\\s*\\($", "", x)))
+      fns <- intersect(fns, all_exported)  # keep only functions in packages
+      if (length(fns) == 0) return(NULL)
+
+      # determine package(s) for each function
+      pkg_list <- sapply(fns, function(fn) {
+        pkgs_found <- names(exported_funs)[sapply(exported_funs, function(e) fn %in% e)]
+        paste(pkgs_found, collapse = ";")
+      })
+
+      data.frame(file = f, line = i, fun = fns, pkg = pkg_list, stringsAsFactors = FALSE)
+    })
+
+    # combine lines in this file
+    do.call(rbind, line_dfs)
+  })
+
+  # combine all files
+  do.call(rbind, res)
+}
+
+
+
+#' Interactive Add Package Namespace Workflow
+#'
+#' Internal helper to find unqualified function calls from specified packages
+#' in R or Rmd files, optionally interactively add `pkg::`, and update originals.
+#'
+#' @param paths Character vector of paths to scan. Default: c("R", "inst/rmd").
+#' @param pkgs Character vector of package names to check for. Default: c("htmltools", "knitr", "gt").
+#' @keywords internal
+#' @noRd
+interactive_add_pkg <- function(paths = c("R", "inst/rmd"),
+                                pkgs = c("htmltools", "knitr", "gt")) {
+
+  # --- 1. Scan for unqualified function calls ---
+  res_list <- lapply(paths, function(p) {
+    pattern <- if (p == "inst/rmd") "\\.Rmd$" else "\\.R$"
+    files <- list.files(p, pattern = pattern, recursive = TRUE, full.names = TRUE)
+
+    # build lookup: package -> exported functions
+    exported_funs <- lapply(pkgs, function(pkg) {
+      tryCatch(getNamespaceExports(pkg), error = function(e) character(0))
+    })
+    names(exported_funs) <- pkgs
+    all_exported <- unlist(exported_funs)
+
+    # scan each file
+    lapply(files, function(f) {
+      lines <- readLines(f, warn = FALSE)
+      code_content <- gsub("#.*$", "", lines)  # remove trailing comments
+
+      line_dfs <- lapply(seq_along(code_content), function(i) {
+        line <- code_content[i]
+        matches <- regmatches(
+          line,
+          gregexpr("\\b(?<![[:alnum:]_:\\$\\[\\.])([a-zA-Z0-9_]+)\\s*\\(", line, perl = TRUE)
+        )
+        fns <- unlist(lapply(matches, function(x) gsub("\\s*\\($", "", x)))
+        fns <- intersect(fns, all_exported)
+        if(length(fns) == 0) return(NULL)
+
+        # determine package(s) for each function
+        pkg_list <- sapply(fns, function(fn) {
+          pkgs_found <- names(exported_funs)[sapply(exported_funs, function(e) fn %in% e)]
+          paste(pkgs_found, collapse = ";")
+        })
+
+        data.frame(file = f, line = i, fun = fns, pkg = pkg_list, stringsAsFactors = FALSE)
+      })
+
+      # combine lines in this file
+      df <- do.call(rbind, line_dfs)
+      if(is.null(df)) {
+        df <- data.frame(file=character(0), line=integer(0), fun=character(0), pkg=character(0), stringsAsFactors = FALSE)
+      }
+      df
+    })
+  })
+
+  # combine all files
+  res <- do.call(rbind, unlist(res_list, recursive = FALSE))
+
+  # ensure res is always a data.frame
+  if(is.null(res) || nrow(res) == 0) {
+    message("No unqualified functions found in the specified paths.")
+    res <- data.frame(file=character(0),
+                      line=integer(0),
+                      fun=character(0),
+                      pkg=character(0),
+                      stringsAsFactors = FALSE)
+    return(invisible(res))
+  }
+
+  print(res)
+
+
+  # --- 2. Option to continue or just search ---
+  ans_continue <- readline("Continue to add pkg:: to functions? [Y/n]: ")
+  if(tolower(ans_continue) == "n") {
+    message("Search-only mode. Returning results without modifying files.")
+    return(invisible(res))
+  }
+
+  # --- 3. Interactive add pkg:: workflow ---
+  for(f in unique(res$file)) {
+    lines <- readLines(f)
+    f_copy <- sub("(\\.R|\\.Rmd)$", "_copy\\1", f)
+    writeLines(lines, f_copy)
+    new_lines <- lines
+    file_res <- res[res$file == f, ]
+
+    for(i in seq_len(nrow(file_res))) {
+      ln <- file_res$line[i]
+      fn <- file_res$fun[i]
+      pkg <- strsplit(file_res$pkg[i], ";")[[1]][1]
+
+      cat("\nFile:", f_copy, "Line", ln, ":", lines[ln], "\n")
+      ans <- readline(paste0("Add ", pkg, ":: to function '", fn, "'? [y/N]: "))
+      if(tolower(ans) == "y") {
+        pattern <- paste0("(?<![[:alnum:]_:\\$\\[\\.])", fn, "\\s*\\(")
+        replacement <- paste0(pkg, "::", fn, "(")
+        new_lines[ln] <- gsub(pattern, replacement, new_lines[ln], perl = TRUE)
+      }
+    }
+
+    writeLines(new_lines, f_copy)
+
+    # compare original vs copy
+    diff_lines <- which(lines != new_lines)
+    if(length(diff_lines) > 0) {
+      cat("\nDifferences between original and _copy:\n")
+      for(ln in diff_lines) {
+        cat(sprintf("Line %d:\n  Original: %s\n  Copy:     %s\n",
+                    ln, lines[ln], new_lines[ln]))
+      }
+
+      ans2 <- readline(paste0("\nUpdate original file '", f, "' with changes from _copy? [y/N]: "))
+      if(tolower(ans2) == "y") {
+        writeLines(new_lines, f)
+        cat("Original file updated:", f, "\n")
+        unlink(f_copy)
+      } else {
+        cat("Original file NOT changed:", f, "\n")
+        unlink(f_copy)
+      }
+    } else {
+      cat("No differences detected for", f_copy, "\n")
+      unlink(f_copy)
+    }
+  }
+
+  invisible(res)
+}
+
+

@@ -4,14 +4,14 @@
 \alias{ccf_pairs}
 \title{pair-wise ccf}
 \usage{
-ccf_pairs(ts1, ts2, max.lag = 10)
+ccf_pairs(ts1, ts2, lag.max = 10)
 }
 \arguments{
 \item{ts1}{first series}
 
 \item{ts2}{second series}
 
-\item{max.lag}{maximum lag for ccf}
+\item{lag.max}{maximum lag for ccf}
 }
 \description{
 pair-wise ccf

@@ -2,52 +2,124 @@
 % Please edit documentation in R/quality_assessment.R
 \name{CFS_qa}
 \alias{CFS_qa}
-\title{tree-ring data measurement assessment}
+\title{Crossdating Field Season Quality Assurance Analysis}
 \usage{
 CFS_qa(
   dt.input,
-  batch_size = 10000,
-  max.lag = 10,
-  max.iter = 100,
-  min.nseries = 100
+  qa.label_data = "",
+  qa.label_trt = "",
+  qa.max_lag = 10,
+  qa.max_iter = 100,
+  qa.min_nseries = 100,
+  qa.blcrit = 0.1,
+  qa.mem_target = 0.6
 )
 }
 \arguments{
-\item{dt.input}{tree ring data with at least 3 columns (SampleID, Year, RawRing)}
+\item{dt.input}{A data.table containing tree-ring measurements with required columns:
+\describe{
+  \item{species}{Character. Species identifier (must be single species)}
+  \item{SampleID}{Character/Integer. Unique sample identifier}
+  \item{Year}{Integer. Year of measurement}
+  \item{RawRing}{Numeric. Raw ring-width measurement}
+  \item{RW_trt}{Numeric. Treated/detrended ring-width series}
+}}
 
-\item{batch_size}{number of pairs to run in a batch, to avoid memory issues in processing large dataset}
+\item{qa.label_data}{Character. Label identifier for the dataset (required)}
 
-\item{max.lag}{maximum lag up to which the correlation should be calculated in CCF}
+\item{qa.label_trt}{Character. Label identifier for the treatment method (required)}
 
-\item{max.iter}{maximum number of iterations of step 2(see Details)}
+\item{qa.max_lag}{Integer. Maximum lag for cross-correlation analysis (default: 10)}
 
-\item{min.nseries}{minimum number of series to run this function}
+\item{qa.max_iter}{Integer. Maximum iterations for chronologies refinement (default: 100)}
+
+\item{qa.min_nseries}{Integer. Minimum number of series required (default: 100)}
+
+\item{qa.blcrit}{Numeric. Borderline threshold criterion for quasi-pass classification (default: 0.1)}
+
+\item{qa.mem_target}{Numeric. Proportion of free memory to use for batch processing
+(0-1, default: 0.6). Higher values use more memory but may be faster.}
 }
 \value{
-A list of 3 elements:
-1) dt.ccf:	A data table containing the CCF results for all samples, including the quality assessment code (qa_code).
-2) master:	The final master chronology, including both raw master chronology, the mean of ring measurement of the series with pass,
-and the treated  master chronology, calculated as the difference of two consecutive raw master chronology.
-3) plot.lst:	plots of the raw and treated ring measurements with year, along with the CCF plots for each sample.
+An object of class \code{cfs_qa} containing:
+  \describe{
+    \item{dt.ccf}{data.table with CCF results and QA codes for each sample}
+    \item{dt.chron}{data.table with chronologies statistics}
+    \item{dt.stats}{data.table with summary statistics per radius}
+    \item{dt.plots}{List of data.tables formatted for plotting (raw and treated series, CCF plots)}
+    \item{qa.parms}{List of QA parameters used in the analysis}
+  }
 }
 \description{
-Assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
+Performs comprehensive quality assurance analysis for tree-ring crossdating
+using pairwise cross-correlation functions and iterative chronologies
+refinement with automatic memory-efficient batch processing.
 }
 \details{
-Assess tree-ring measurement accuracy using a treated series based on the differences between two consecutive tree-ring measurements.
-The algorithm consists of two main steps:
+The function performs a two-step quality assurance process:
 
- Step 1. Perform pairwise CCF on the treated series of all possible combinations of the samples.
-raw ring master chronology is calculated as the average of the ring measurements of samples that achieve the maximum correlation at lag 0 with at least one other sample in the cross-correlation function (CCF).
- The difference series of the raw ring master chronology is used as the initial treated master chronology for next step.
+\strong{Step 1: Pairwise Cross-Correlation}
+\itemize{
+  \item Computes CCF for all pairs of treated series
+  \item Uses auto-batching to manage memory efficiently
+  \item Identifies initial candidate samples with max CCF at lag 0
+}
 
- Step 2. Perform CCF between the treated series of each sample and the initial treated master chronology.
- Samples that do not meet the criteria will be removed from the recalculation of the treated master chronology.
- This step is repeated until all remaining samples in the master chronology meet the criteria.
+\strong{Step 2: Iterative chronologies Refinement}
+\itemize{
+  \item Computes chronologies from candidate samples
+  \item Evaluates each sample against the chronologies
+  \item Iteratively refines sample list until convergence
+}
 
-This process results in five categories classification for all samples (pass, borderline, pm1, highpeak, fail)
+\strong{QA Code Classification:}
+\itemize{
+  \item \code{pass}: Maximum correlation at lag 0
+  \item \code{borderline}: Second highest correlation at lag 0 (within threshold)
+  \item \code{pm1}: Maximum correlation at lag ±1 (slight misalignment)
+  \item \code{highpeak}: Maximum at non-zero lag, >2x second highest
+  \item \code{fail}: All other cases
+}
 
+\strong{Auto-batching:}
+The function automatically determines optimal batch size based on:
+\itemize{
+  \item Available system memory
+  \item Number of CPU cores
+  \item Estimated memory per CCF operation
+  \item Safety margins to prevent out-of-memory errors
+}
+}
+\examples{
+\dontrun{
+# Prepare your tree-ring data
+dt.input <- data.table(
+  species = "PIPO",
+  SampleID = rep(1:150, each = 100),
+  Year = rep(1900:1999, 150),
+  RawRing = rnorm(15000, 2, 0.5),
+  RW_trt = rnorm(15000, 0, 0.3)
+)
 
-To enhance efficiency and mitigate potential memory issues,
-The function supports both parallel (multi-session) and sequential modes, and also offers a batch processing option for users.
+# Run QA analysis with auto-batching
+result <- CFS_qa(
+  dt.input = dt.input,
+  qa.label_data = "Site_A_2024",
+  qa.label_trt = "Spline_Detrend",
+  qa.max_lag = 10,
+  qa.mem_target = 0.6  # Use 60\% of free memory
+)
+
+# Examine results
+summary(result$dt.ccf)
+table(result$dt.ccf$qa_code)
+print(result$dt.chron)
+}
+
+}
+\references{
+Add relevant references for crossdating methodology
+}
+\seealso{
+\code{\link{ccf}} for cross-correlation function
 }
