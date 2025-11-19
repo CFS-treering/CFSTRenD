@@ -38,7 +38,7 @@ knitr::opts_chunk$set(
 if (!requireNamespace("htmltools", quietly = TRUE)) {
   stop("Package 'htmltools' is required to run this function. Please install it.")
 }
-library(CFSTRenD)
+library(growthTrendR)
 library(data.table)
 library(ggplot2)
 library(sf)
@@ -49,7 +49,7 @@ library(sf)
 
 # Additive models
 
-GAMs/GAMMs handle nonlinear relationships and can include random effects (e.g., site or tree identity) to account for hierarchical structures and temporal or spatial dependencies, making them well-suited for modeling complex dendrochronological data. in CFSTRenD package, a suite of GAM/GAMM models has been implemented to accommodate different types of datasets. Here, we use a single model, gamm_spatial, to demonstrate how to generate a fitting and diagnostic model report from raw data.
+GAMs/GAMMs handle nonlinear relationships and can include random effects (e.g., site or tree identity) to account for hierarchical structures and temporal or spatial dependencies, making them well-suited for modeling complex dendrochronological data. in growthTrendR package, a suite of GAM/GAMM models has been implemented to accommodate different types of datasets. Here, we use a single model, gamm_spatial, to demonstrate how to generate a fitting and diagnostic model report from raw data.
 
 
 ### **prepare data for model:**
@@ -57,17 +57,17 @@ GAMs/GAMMs handle nonlinear relationships and can include random effects (e.g., 
 
 
 # loading processed ring measurement
-samples69.trt <- readRDS(system.file("extdata", "samples69.trt.rds", package = "CFSTRenD"))
+samples69.trt <- readRDS(system.file("extdata", "samples69.trt.rds", package = "growthTrendR"))
 
 # if no processed data, run function CFS_format() from raw dataset
 # # ring measurement
-# samples69.o <- fread(system.file("extdata", "samples69.csv", package = "CFSTRenD"))
+# samples69.o <- fread(system.file("extdata", "samples69.csv", package = "growthTrendR"))
 # 
-# # formatting the users' data conformed to CFSTRenD
+# # formatting the users' data conformed to CFS-TRenD structure
 # samples69.trt <- CFS_format(data = list(samples69.o, 39:111), usage = 1, out.csv = NULL)
 
 # climate
-clim69 <- fread(system.file("extdata", "clim69.csv", package = "CFSTRenD"))
+clim69 <- fread(system.file("extdata", "clim69.csv", package = "growthTrendR"))
 
 # merge data
 samples69_clim <- merge(samples69.trt$tr_all_wide[, c("uid_site", "site_id","latitude", "longitude",  "species", "uid_tree", "uid_radius")], samples69.trt$tr_all_long$tr_7_ring_widths, by = "uid_radius")

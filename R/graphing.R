@@ -246,12 +246,50 @@ plot_scale <- function(dt.scale){
     )
 
 
-  g2 <- ggplot(dt.scale$dt.plots[[2]], aes(x = longitude, y = latitude, size = rw.median)) +
-    geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")), alpha = 1) +
+  # g2 <- ggplot(dt.scale$dt.plots[[2]], aes(x = longitude, y = latitude, size = rw.median)) +
+  #   geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")), alpha = 1) +
+  #   scale_color_identity() +
+  #   scale_size_continuous(
+  #     name = "rw median (mm)"
+  #   ) +
+  #   guides(size = guide_legend(override.aes = list(color = "darkblue"))) +
+  #   scale_x_continuous(breaks = scales::pretty_breaks(n = 3), expand = expansion(mult = 0.3)) +
+  #   scale_y_continuous(breaks = scales::pretty_breaks(n = 5), expand = expansion(mult = 0.2)) +
+  #   theme_minimal() +
+  #   theme(
+  #     strip.text = element_text(size = 16),
+  #     panel.grid.minor = element_blank(),
+  #     plot.title = element_text(size = 18),
+  #     legend.text = element_text(color = "darkblue"),
+  #     legend.title = element_text(color = "darkblue")
+  #   ) +
+  #   labs(
+  #     x = "Longitude",
+  #     y = "Latitude"
+  #   )
+
+  dt <- dt.scale$dt.plots[["med.site"]]
+
+  # Compute automatic contrast: small contrast if values are close
+  rng <- range(dt$rw.median, na.rm = TRUE)
+  spread <- diff(rng)
+
+  # Define size range automatically
+  # small spread → small size variation
+  size_min <- 4
+  size_max <- 4 + pmin(spread, 1) * 3
+  # when spread is small (<1), range is small
+  # when spread is large, range expands up to +3
+
+  g2 <- ggplot(dt,
+         aes(x = longitude, y = latitude, size = rw.median)) +
+    geom_point(aes(color = ifelse(ord == 0, "red", "darkblue")),
+               alpha = 1) +
     scale_color_identity() +
     scale_size_continuous(
-      name = "rw median (mm)"
-    ) +
+      name = "rw median (mm)",
+      range = c(size_min, size_max)
+    )+
     guides(size = guide_legend(override.aes = list(color = "darkblue"))) +
     scale_x_continuous(breaks = scales::pretty_breaks(n = 3), expand = expansion(mult = 0.3)) +
     scale_y_continuous(breaks = scales::pretty_breaks(n = 5), expand = expansion(mult = 0.2)) +
@@ -291,7 +329,7 @@ plot_ds <- function(data){
   dt.rw <- data[[2]]
   spc <- unique(dt.tr$species)
 
-  # shp <- st_read(system.file("extdata", "Mapping", "province.shp", package = "CFSTRenD"))
+  # shp <- st_read(system.file("extdata", "Mapping", "province.shp", package = "growthTrendR"))
   # canada_lcc <- st_transform(shp, crs = 3347)
   p.rw_hist <- ggplot(dt.rw, aes(x = rw_mm)) +
     geom_histogram(binwidth = 1, color = "black", fill =  "lightgreen") +
@@ -447,42 +485,22 @@ plot_facet <- function(data, varcols, xylabels, nrow, ncol) {
 
 
 
-# generate_vignette <- function(output_file = NULL) {
-#
-#   # Path to the R Markdown template
-#   # rmd_file <- system.file("rmd", paste0(type.templt,"_report_template.Rmd"), package = "CFSTRenD")
-#   rmd_file <- file.path("P:/Jing/2010-08/Martin/Treering_bank/Git/CFSTRenD/inst", paste0("vignette_CFSTRenD.Rmd"))
-#
-#   # Check if the template exists
-#   if (rmd_file == "") {
-#     stop("Template not found! Ensure 'data_report_template.Rmd' is in inst/rmd/ directory.")
-#   }
-#
-#   # Render the report
-#   if (is.null(output_file) ) rstudioapi::viewer( rmarkdown::render(rmd_file)) else
-#
-#     rmarkdown::render(
-#       input = rmd_file,
-#       output_file = output_file,
-#       envir = new.env(parent = globalenv()) # Isolate environment
-#     )
-# }
 
 
 
-#' Generate Automated Reports from CFSTRenD Objects
+#' Generate Automated Reports
 #'
-#' Creates HTML reports from various CFSTRenD analysis objects using predefined
+#' Creates HTML reports from various analysis objects using predefined
 #' R Markdown templates. The function automatically selects the appropriate template
 #' based on the input object's class and renders a comprehensive report with
 #' visualizations and analysis results.
 #'
-#' @param robj An R object containing analysis results from CFSTRenD functions.
+#' @param robj An R object containing analysis results from functions in this package.
 #'   The object's class determines which report template is used. Supported
 #'   classes depend on available templates in the package.
-#' @param data_report.reports_sel Numeric vector. Specifies which report sections
+#' @param data_report.reports_sel Numeric vector. Specifies which report sections of data report
 #'   to include in the output. Default is c(1,2,3,4) to include all sections.
-#'   The meaning of each number depends on the specific template being used.
+#'   1-project level; 2- species level; 3- site level; and 4- radius level.
 #' @param output_file Character string. Optional path and filename for the output
 #'   HTML file. If NULL (default), the report is generated with an automatic
 #'   filename and opened in RStudio viewer.
@@ -525,28 +543,6 @@ plot_facet <- function(data, varcols, xylabels, nrow, ncol) {
 #' }
 #'
 #'
-#' @examples
-#' \dontrun{
-#' # Generate default report for a CFSTRenD analysis object
-#' my_results <- some_cfstrend_function(data)
-#' generate_report.a(my_results)
-#'
-#' # Generate report with specific sections only
-#' generate_report.a(my_results, data_report.reports_sel = c(1, 3))
-#'
-#' # Save report to specific file with custom parameters
-#' generate_report.a(my_results,
-#'                   data_report.reports_sel = c(1, 2, 4),
-#'                   output_file = "my_analysis_report.html",
-#'                   custom_title = "Forest Analysis Results",
-#'                   include_maps = TRUE)
-#'
-#' # Generate report with additional template parameters
-#' generate_report.a(my_results,
-#'                   output_file = "detailed_report.html",
-#'                   animation_fps = 2.0,
-#'                   color_scheme = "viridis")
-#' }
 #'
 #' @note
 #' This function requires that appropriate R Markdown templates exist in the
@@ -584,8 +580,8 @@ generate_report <- function(robj, data_report.reports_sel = c(1,2,3,4), output_f
   # print(type.templt)
   # if (type.templt == "unknown") stop("The input is not supported by this procedure, please check...") else
   # Path to the R Markdown template
-   # rmd_file <- file.path("C:/Users/xjguo/Documents/Rpackages/CFSTRenD/inst/rmd", paste0("template_", tpl_info$template, ".Rmd"))
-  rmd_file <- system.file("rmd", paste0("template_", tpl_info$template, ".Rmd"), package = "CFSTRenD" )
+   # rmd_file <- file.path("C:/Users/xjguo/Documents/Rpackages/growthTrendR/inst/rmd", paste0("template_", tpl_info$template, ".Rmd"))
+  rmd_file <- system.file("rmd", paste0("template_", tpl_info$template, ".Rmd"), package = "growthTrendR" )
 
 
   # Check if the template exists

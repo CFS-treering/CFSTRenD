@@ -716,7 +716,7 @@ gamm_main <- function(data, resp_scale = "resp_gamma", m.option, m.candidates){
 
 
 format_byterm <- function(model, dt.pred){
-  if (is.null(model) | is.null(dt.pred)) stop("please refit the model with package CFSTRenD...")
+  if (is.null(model) | is.null(dt.pred)) stop("please refit the model with package growthTrendR...")
 
   setDT(dt.pred)
   rhs_terms <-attr(terms(model$formula), "term.labels")

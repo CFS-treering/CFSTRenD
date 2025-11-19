@@ -37,17 +37,13 @@ knitr::opts_chunk$set(
 if (!requireNamespace("htmltools", quietly = TRUE)) {
   stop("Package 'htmltools' is required to run this function. Please install it.")
 }
-# library(CFSTRenD)
-# library(data.table)
-# library(ggplot2)
-# library(sf)
 
 
 ```
 
 # Introduction
 
-This vignette demonstrates the main workflow of the **CFSTRenD** package for manipulating, analyzing, and visualizing tree-ring data and model performance.
+This vignette demonstrates the main workflow of the **growthTrendR** package for manipulating, analyzing, and visualizing tree-ring data and model performance.
 
 The workflow includes:
 

@@ -1,5 +1,4 @@
 ---
-  # title: "vignette_CFSTRenD"
 title: "Generalized Additive Model Analysis Report"
 
 date: "`r Sys.Date()`"
@@ -19,7 +18,7 @@ library(mgcv)
 library(ggplot2)
 library(dplyr)
 library(stringr)
-library(CFSTRenD)
+library(growthTrendR)
 library(ggeffects)
 library(cowplot)
 

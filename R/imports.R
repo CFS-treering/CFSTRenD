@@ -1,6 +1,6 @@
 # utils.R
 # ----------------------------
-# Centralized package imports for CFSTRenD
+# Centralized package imports for growthTrendR
 # ----------------------------
 
 

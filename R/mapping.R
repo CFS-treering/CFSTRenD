@@ -242,7 +242,7 @@ CFS_mapping <- function(data, year.span = c(1801, 2017),
 #'
 #' @details
 #' The function performs spatial interpolation using IDW and masks outputs to Canada and boreal zones using shapefiles.
-#' The elevation layer and mask files are internal to the \code{CFSTRenD} package and used for contextual mapping.
+#' The elevation layer and mask files are internal to the \code{growthTrendR} package and used for contextual mapping.
 #'
 #' PNG and GIF outputs are generated using \code{magick}, raster outputs via \code{terra}, and interpolation via \code{gstat}.
 #'
@@ -261,17 +261,17 @@ CFS_mapping <- function(data, year.span = c(1801, 2017),
 #' @examples
 #' \dontrun{
 #' # Basic usage - return animated GIFs
-#' gif_results <- plot_mapping3(cfs_data)
+#' gif_results <- plot_mapping(cfs_data)
 #'
 #' # Generate all output formats
-#' plot_mapping3(cfs_data,
+#' plot_mapping(cfs_data,
 #'               animation_fps = 2.0,
 #'               parms.out = c("png", "gif", "csv"),
 #'               dir.out = "output_folder")
 #'
 #'
 #' # Custom animation speed and plot parameters
-#' plot_mapping3(cfs_data,
+#' plot_mapping(cfs_data,
 #'               animation_fps = 0.5,
 #'               parms.out = "gif",
 #'               dir.out = "slow_gifs")
@@ -281,7 +281,7 @@ CFS_mapping <- function(data, year.span = c(1801, 2017),
 #' @export
 
 
-plot_mapping3 <- function(data, year.span = c(1801,2017),
+plot_mapping <- function(data, year.span = c(1801,2017),
                      # cols.meta = c("uid_tree", "uid_site", "longitude", "latitude", "species", "year"),
                        extent.lim = NULL, grid.step = 0.1 , animation_fps = 1.0,
                      # png.text = list(text1= "BAI Annual Growth Change -", text_bott = "Created by Martin P. Girardin, Canadian Forest Service (2025)" , text_side = "Growth Change (%)"),
@@ -327,12 +327,12 @@ plot_mapping3 <- function(data, year.span = c(1801,2017),
 
   ncells_total <- nrow(final_df)
 
-  elevation_file <- system.file("extdata/Mapping/Canada120s.tif", package = "CFSTRenD")
+  elevation_file <- system.file("extdata/Mapping/Canada120s.tif", package = "growthTrendR")
 
   # Read elevation and shapefiles
   elevation <- rast(elevation_file)
 
-  # boreal_mask <- sf::st_read(system.file("extdata/Mapping/NABoreal_expanded.shp", package = "CFSTRenDdata"))
+
   # using the figshare that martin provided to avoid big extdata
   # the reference is here https://doi.org/10.6084/m9.figshare.30005473.v1 (Martin 2025-10-01) then redirect to
   # https://figshare.com/articles/dataset/Spatially_detailed_tree-ring_analysis_throughout_Canada/30005473
@@ -341,7 +341,7 @@ plot_mapping3 <- function(data, year.span = c(1801,2017),
 
 
   boreal_mask <- get_boreal_mask("https://figshare.com/ndownloader/files/57487996")
-  canada_mask <- sf::st_read(system.file("extdata/Mapping/province.shp", package = "CFSTRenD"))
+  canada_mask <- sf::st_read(system.file("extdata/Mapping/province.shp", package = "growthTrendR"))
 
   spc.lst <- sort(unique(data$species.inuse))
     # run over all species

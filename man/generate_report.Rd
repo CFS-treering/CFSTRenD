@@ -2,7 +2,7 @@
 % Please edit documentation in R/graphing.R
 \name{generate_report}
 \alias{generate_report}
-\title{Generate Automated Reports from CFSTRenD Objects}
+\title{Generate Automated Reports}
 \usage{
 generate_report(
   robj,
@@ -12,13 +12,13 @@ generate_report(
 )
 }
 \arguments{
-\item{robj}{An R object containing analysis results from CFSTRenD functions.
+\item{robj}{An R object containing analysis results from functions in this package.
 The object's class determines which report template is used. Supported
 classes depend on available templates in the package.}
 
-\item{data_report.reports_sel}{Numeric vector. Specifies which report sections
+\item{data_report.reports_sel}{Numeric vector. Specifies which report sections of data report
 to include in the output. Default is c(1,2,3,4) to include all sections.
-The meaning of each number depends on the specific template being used.}
+1-project level; 2- species level; 3- site level; and 4- radius level.}
 
 \item{output_file}{Character string. Optional path and filename for the output
 HTML file. If NULL (default), the report is generated with an automatic
@@ -33,7 +33,7 @@ Character string. The file path of the generated HTML report.
   As a side effect, if output_file is NULL, opens the report in RStudio viewer.
 }
 \description{
-Creates HTML reports from various CFSTRenD analysis objects using predefined
+Creates HTML reports from various analysis objects using predefined
 R Markdown templates. The function automatically selects the appropriate template
 based on the input object's class and renders a comprehensive report with
 visualizations and analysis results.
@@ -79,27 +79,3 @@ Common patterns include:
 }
 }
 
-\examples{
-\dontrun{
-# Generate default report for a CFSTRenD analysis object
-my_results <- some_cfstrend_function(data)
-generate_report.a(my_results)
-
-# Generate report with specific sections only
-generate_report.a(my_results, data_report.reports_sel = c(1, 3))
-
-# Save report to specific file with custom parameters
-generate_report.a(my_results,
-                  data_report.reports_sel = c(1, 2, 4),
-                  output_file = "my_analysis_report.html",
-                  custom_title = "Forest Analysis Results",
-                  include_maps = TRUE)
-
-# Generate report with additional template parameters
-generate_report.a(my_results,
-                  output_file = "detailed_report.html",
-                  animation_fps = 2.0,
-                  color_scheme = "viridis")
-}
-
-}
